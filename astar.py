@@ -52,7 +52,8 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
     while not open_set.empty():
         current_node = open_set.get()[2]
         
-        if current_node.waypoint.transform.location.distance(end_waypoint.transform.location) < 2.0:
+        # Early exit if we have reached near the goal
+        if current_node.waypoint.transform.location.distance(end_waypoint.transform.location) < 10.0:
             path = []
             while current_node:
                 path.append(current_node.waypoint)
@@ -117,29 +118,33 @@ def main():
     start_waypoint = carla_map.get_waypoint(point_a.location)
     end_waypoint = carla_map.get_waypoint(point_b.location)
 
-    print(f"Firetruck starting at {point_a.location}")
+    print("Firetruck starting at", point_a.location)
     print(f"Destination: {point_b.location}")
 
 
     # Manual waypoint selection
     # Uncomment below to manually test with 2 points
 
-    # These two points are used to test lane changes
+    # # These two points are used to test lane changes
     # point_a = carla.Location(x=-52.133560, y=-40.180298, z=0.600000)
     # point_b = carla.Location(x=-111.120361, y=72.898865, z=0.600000)
 
     # # Another 2 points to test if vehicle should stop nearby destination
-    # # point_a = carla.Location(x=-64.581863, y=-65.167366, z=0.600000)
-    # # point_b = carla.Location(x=-27.022133, y=69.714005, z=0.600000)
+    # point_a = carla.Location(x=-64.581863, y=-65.167366, z=0.600000)
+    # point_b = carla.Location(x=-27.022133, y=69.714005, z=0.600000)
 
-    # # Get the waypoint closest to point_a and point_b
-    # waypoint_a = carla_map.get_waypoint(point_a, project_to_road=True)
-    # waypoint_b = carla_map.get_waypoint(point_b, project_to_road=True)
+    # # Another 2 points to test if vehicle should stop nearby destination
+    # point_a = carla.Location(x=109.946968, y=-17.187952, z=0.599999)
+    # point_b = carla.Location(x=26.382587, y=-57.401386, z=0.600000)
 
-    # start_waypoint = waypoint_a
-    # end_waypoint = waypoint_b
-    # print(f"Point A wp: {start_waypoint}")
-    # print(f"Point B wp: {end_waypoint}")
+    # Get the waypoint closest to point_a and point_b
+    waypoint_a = carla_map.get_waypoint(point_a, project_to_road=True)
+    waypoint_b = carla_map.get_waypoint(point_b, project_to_road=True)
+
+    start_waypoint = waypoint_a
+    end_waypoint = waypoint_b
+    print(f"Point A wp: {start_waypoint}")
+    print(f"Point B wp: {end_waypoint}")
     
 
 
@@ -147,6 +152,7 @@ def main():
     route = a_star(world, start_waypoint, end_waypoint)
 
     if route is None:
+        # To prevent infinite loop
         print("Failed to find a path. Try adjusting the max_distance in the a_star function.")
         firetruck.destroy()
         return
