@@ -15,7 +15,7 @@ class D_star(object):
             self.world = self.client.get_world()
             self.map = self.world.get_map()
         except Exception as e:
-            print("Failed to connect to Carla")
+            print(f"Failed to connect to Carla: {e}")
             return
 
         self.resolution = resolution
