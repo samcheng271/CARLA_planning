@@ -159,30 +159,30 @@ def main():
 
     print(f"Route found with {len(route)} waypoints")
 
-    try:
-        start_time = time.time()
-        timeout = 300  # 5 minutes timeout
 
-        # Draws the route the vehicle will follow (red)
-        for waypoint in route:
-            world.debug.draw_string(waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
+    start_time = time.time()
+    timeout = 300  # 5 minutes timeout
 
-        # Follow the route
-        for i, waypoint in enumerate(route):
-            if time.time() - start_time > timeout:
-                print(f"Timeout reached after {timeout} seconds")
-                break
+    # Draws the route the vehicle will follow (red)
+    for waypoint in route:
+        world.debug.draw_string(waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
 
-            firetruck.set_transform(waypoint.transform)
-            if i % 10 == 0:  # Print progress every 10 waypoints
-                print(f"Waypoint {i}/{len(route)}")
-            time.sleep(0.05)  # Reduced delay for faster execution
+    # Follow the route
+    for i, waypoint in enumerate(route):
+        if time.time() - start_time > timeout:
+            print(f"Timeout reached after {timeout} seconds")
+            break
 
-        print("Firetruck has reached its destination or the route has ended!")
+        firetruck.set_transform(waypoint.transform)
+        if i % 10 == 0:  # Print progress every 10 waypoints
+            print(f"Waypoint {i}/{len(route)}")
+        time.sleep(0.05)  # Reduced delay for faster execution
 
-    finally:
-        # Clean up
-        firetruck.destroy()
+    print("Firetruck has reached its destination or the route has ended!")
+
+
+    # Clean up
+    firetruck.destroy()
 
 if __name__ == '__main__':
     try:
