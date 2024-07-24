@@ -59,3 +59,15 @@ class DStarLite:
 
         start_waypoint = carla_map.get_waypoint(start_transform.location)
         end_waypoint = carla_map.get_waypoint(end_transform.location)
+
+        # Get the route
+        # route = DStarLite_route(world, start_waypoint, end_waypoint)
+
+        # Draws the route the vehicle will follow (red)
+        # for waypoint in route:
+        #     world.debug.draw_string(waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
+        
+        # for waypoint in route:
+        #     vehicle.set_transform(waypoint.transform)
+        #     time.sleep(0.05)
+

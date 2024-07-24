@@ -96,24 +96,24 @@ class D_star(object):
             return -1
         self.checkState(x)
         if kold < self.h[x]:
-            for y in children(self, x):
+            for y in self.children(x):
                 self.checkState(y)
-                a = self.h[y] + cost(self, y, x)
+                a = self.h[y] + self.cost(y, x)
                 if self.h[y] <= kold and self.h[x] > a:
                     self.b[x], self.h[x] = y, a
         if kold == self.h[x]:
-            for y in children(self, x):
+            for y in self.children(x):
                 self.checkState(y)
-                bb = self.h[x] + cost(self, x, y)
+                bb = self.h[x] + self.cost(x, y)
                 if self.tag[y] == 'New' or \
                 (self.b[y] == x and self.h[y] != bb) or \
                         (self.b[y] != x and self.h[y] > bb):
                     self.b[y] = x
                     self.insert(y, bb)
         else:
-            for y in children(self, x):
+            for y in self.children(x):
                 self.checkState(y)
-                bb = self.h[x] + cost(self, x, y)
+                bb = self.h[x] + self.cost(x, y)
                 if self.tag[y] == 'New' or \
                         (self.b[y] == x and self.h[y] != bb):
                     self.b[y] = x
@@ -188,13 +188,13 @@ class D_star(object):
             s = sparent
         self.Path = self.path()
         self.visualize_path(self.Path)
-    plt.show()
+
 
     def init_vehicle(self):
         try:
             spawn_points = self.world.get_map().get_spawn_points()
             vehicle_bp = self.world.get_blueprint_library().filter('vehicle.*')[0]
-            self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_points[0])
+            self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_points[2])
              
             if self.vehicle:
                 print("Vehicle spawned for simulation.")

@@ -159,9 +159,9 @@ def main():
 
     print(f"Route found with {len(route)} waypoints")
 
-
-    start_time = time.time()
-    timeout = 300  # 5 minutes timeout
+    # Keeping for debugging purposes
+    # start_time = time.time()
+    # timeout = 300  # 5 minutes timeout
 
     # Draws the route the vehicle will follow (red)
     for waypoint in route:
@@ -169,9 +169,10 @@ def main():
 
     # Follow the route
     for i, waypoint in enumerate(route):
-        if time.time() - start_time > timeout:
-            print(f"Timeout reached after {timeout} seconds")
-            break
+        # Keeping for debugging purposes
+        # if time.time() - start_time > timeout:
+        #     print(f"Timeout reached after {timeout} seconds")
+        #     break
 
         firetruck.set_transform(waypoint.transform)
         if i % 10 == 0:  # Print progress every 10 waypoints
