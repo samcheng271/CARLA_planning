@@ -95,12 +95,12 @@ class DStarLite:
         start_waypoint = carla_map.get_waypoint(start_transform.location)
         end_waypoint = carla_map.get_waypoint(end_transform.location)
 
-        slast = sstart
+        s_last = s_start
 
         self.Initialize()
         self.ComputeShortestPath()
 
-        while(sstart != sgoal):
+        while(s_start != s_goal):
             self.s_start = min(self.succ(self.s_start), key=lambda s: self.c(self.s_start, s) + self.g.get(s, inf))
             self.move_to(self.s_start)
 
