@@ -23,6 +23,10 @@ class D_star(object):
         self.waypoints = self.map.generate_waypoints(self.resolution)
         self.state_space = self.convert_waypoints(self.waypoints)
 
+        self.print_waypoints()
+        self.print_state_space()
+        self.visualize_waypoints()
+
         self.x0 = self.get_nearest_state(self.state_space, (0, 0, 0))
         self.xt = self.get_nearest_state(self.state_space, (50, 50, 0))
         self.b = defaultdict(lambda: defaultdict(dict))
@@ -37,6 +41,7 @@ class D_star(object):
 
         self.init_vehicle()
 
+    #generates and returns a dict of direction vectors with their associated Euclidean dist
     def generate_directions(self):
         directions = {}
         for dx in [-1, 0, 1]:
@@ -48,15 +53,28 @@ class D_star(object):
                     directions[(dx, dy, dz)] = distance
         return directions
 
+
+    #converts carla waypoints objects into list of x,y,z coordinate tuples 
     def convert_waypoints(self, waypoints):
         return [(wp.transform.location.x, wp.transform.location.y, wp.transform.location.z) for wp in waypoints]
 
+    def print_waypoints(self):
+        for wp in self.waypoints:
+            print(f"Waypoint at location: x={wp.transform.location.x}, y={wp.transform.location.y}, z={wp.transform.location.z}")
+
+    def print_state_space(self):
+        for state in self.state_space:
+            print(f"State: {state}")
+
+
+    #finds the state in state_space closest to a point 
     def get_nearest_state(self, state_space, point):
     #min value of state_space, key arg is used to carry out Euclidean dist between state and point-the point we want to find the nearest state to
     #np.lingalg.norm- calculates the Euclidean norm for the difference vector
         nearest_state = min(state_space, key=lambda state: np.linalg.norm(np.array(state) - np.array(point)))
         return nearest_state
 
+    #checks if a 'y' state has both heuristic and tag dicts 
     def checkState(self, y):
         if y not in self.h:
             self.h[y] = 0
@@ -69,6 +87,7 @@ class D_star(object):
             return min(self.OPEN.values())
         return -1
 
+    #removes state with smalest key value from Open set
     def min_state(self):
         if self.OPEN:
             minvalue = min(self.OPEN.values())
@@ -96,24 +115,24 @@ class D_star(object):
             return -1
         self.checkState(x)
         if kold < self.h[x]:
-            for y in self.children(x):
+            for y in children(self, x):
                 self.checkState(y)
-                a = self.h[y] + self.cost(y, x)
+                a = self.h[y] + cost(self, y, x)
                 if self.h[y] <= kold and self.h[x] > a:
                     self.b[x], self.h[x] = y, a
         if kold == self.h[x]:
-            for y in self.children(x):
+            for y in children(self, x):
                 self.checkState(y)
-                bb = self.h[x] + self.cost(x, y)
+                bb = self.h[x] + cost(self, x, y)
                 if self.tag[y] == 'New' or \
-                (self.b[y] == x and self.h[y] != bb) or \
+                        (self.b[y] == x and self.h[y] != bb) or \
                         (self.b[y] != x and self.h[y] > bb):
                     self.b[y] = x
                     self.insert(y, bb)
         else:
-            for y in self.children(x):
+            for y in children(self, x):
                 self.checkState(y)
-                bb = self.h[x] + self.cost(x, y)
+                bb = self.h[x] + cost(self, x, y)
                 if self.tag[y] == 'New' or \
                         (self.b[y] == x and self.h[y] != bb):
                     self.b[y] = x
@@ -152,18 +171,20 @@ class D_star(object):
             x = self.b[x]
         return path
 
+    #retuns list of neighboring states for a state 
     def children(self, state):
         children = []
         for direction, _ in self.Alldirec.items():
             child = tuple(np.array(state) + np.array(direction))
             if child in self.state_space:
-                    children.append(child)
+                children.append(child)
         return children
 
-    def cost(self, from_state, to_state):
-        if to_state in self.Obstaclemap:
+    #calculates the cost of moving from one state to next state 
+    def cost(self, start, goal):
+        if goal in self.Obstaclemap:
             return np.inf
-        return np.linalg.norm(np.array(from_state) - np.array(to_state))
+        return np.linalg.norm(np.array(start) - np.array(goal))
 
     def run(self):
         self.OPEN[self.xt] = 0
@@ -177,25 +198,25 @@ class D_star(object):
         # Handle dynamic environment changes in CARLA
         for i in range(5):
             self.move_vehicle()
-        s = self.x0
-        while s != self.xt:
-            sparent = self.b[s]
+            s = self.x0
+            while s != self.xt:
+                sparent = self.b[s]
             # checks if cost is infinite to move from sparent to s and modifies to update cost 
-            if self.cost(s, sparent) == np.inf:
-                self.modify(s)
-                continue
-            self.ind += 1
-            s = sparent
-        self.Path = self.path()
-        self.visualize_path(self.Path)
+                if self.cost(s, sparent) == np.inf:
+                    self.modify(s)
+                    continue
+                self.ind += 1
+                s = sparent
+            self.Path = self.path()
+            self.visualize_path(self.Path)
+        plt.show()
 
-
+    #spawns vehicle in carla
     def init_vehicle(self):
         try:
             spawn_points = self.world.get_map().get_spawn_points()
             vehicle_bp = self.world.get_blueprint_library().filter('vehicle.*')[0]
-            self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_points[2])
-             
+            self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_points[0])
             if self.vehicle:
                 print("Vehicle spawned for simulation.")
             else:
@@ -203,17 +224,20 @@ class D_star(object):
         except Exception as e:
             print(f"Error initializing vehicle: {e}")
 
+    #controls vehicle to be moved from one place to another
     def move_vehicle(self):
         if not self.vehicle:
             print("Vehicle not initialized.")
             return
 
         if self.Path:
-            next_waypoint = self.Path.pop()
+            next_waypoint = self.Path.pop(0)
             location = carla.Location(x=next_waypoint[0][0], y=next_waypoint[0][1], z=next_waypoint[0][2])
             self.vehicle.set_location(location)
+
+            time.sleep(0.1)
         else:
-            print("Path is empty, cannot move vehicle.")
+            print("Path empty.")
 
     def visualize_path(self, path):
         debug = self.world.debug
