@@ -17,6 +17,9 @@ class DStarLite:
     def heuristic(self, waypoint1, waypoint2):
         return waypoint1.transform.location.distance(waypoint2.transform.location)
 
+    def wp_key(self, waypoint):
+        return (waypoint.transform.location.x, waypoint.transform.location.y, waypoint.transform.location.z)
+
     def calculate_key(self, s):
         if s not in self.g:
             self.g[s] = float('inf')
@@ -47,6 +50,28 @@ class DStarLite:
                 self.U.insert(u, self.calculate_key(u))
         elif (self.g(u) == self.rhs(u) and u in self.U):
             self.U.remove(u)
+
+    def succ(self, waypoint):
+        successor = []
+        wp_succ = waypoint.next(2.0)
+
+        for wp in wp_succ:
+            successor.append(wp)
+        return successor
+    
+    def pred(self, waypoint):
+        for wp in self.waypoints:
+            suc = []
+            wp_key = self.wp_key(wp)
+            wp_succ = waypoint.next(2.0)
+
+            for succ in successor:
+                succ_key = self.wp_key(succ)
+                self.pred_dict[succ_key].append(wp)  
+
+        self.rhs[self.wp_key(self.goal)] = 0
+        self.U.insert((self.calculate_key(self.wp_key(self.goal)), self.wp_key(self.goal)))
+        
 
     def ComputeShortestPath(self):
         while (self.U.TopKey() < self.calculate_key(self.s_start) or
@@ -80,7 +105,12 @@ class DStarLite:
                         self.rhs[s] = min_succ
                 self.UpdateVertex(s)
 
+    def c(self, s1, s2):
+        wp1 = next(wp for wp in self.waypoints if self.wp_key(wp) == s1)
+        wp2 = next(wp for wp in self.waypoints if self.wp_key(wp) == s2)
+        return wp1.transform.location.distance(wp2.transform.location)
 
+    
     def main():
         client = carla.Client('localhost', 4000)
         client.set_timeout(10.0)
