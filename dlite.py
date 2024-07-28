@@ -13,6 +13,7 @@ class DStarLite:
         self.g = {}
         self.rhs = {}
         self.epsilon = 1
+        
 
     def heuristic(self, waypoint1, waypoint2):
         return waypoint1.transform.location.distance(waypoint2.transform.location)
@@ -21,10 +22,6 @@ class DStarLite:
         return (waypoint.transform.location.x, waypoint.transform.location.y, waypoint.transform.location.z)
 
     def calculate_key(self, s):
-        if s not in self.g:
-            self.g[s] = float('inf')
-        if s not in self.rhs:
-            self.rhs[s] = float('inf')
         return [
             min(self.g[s], self.rhs[s]) + self.epsilon * self.heuristic(s, self.start) + self.km,
             min(self.g[s], self.rhs[s])
@@ -41,6 +38,7 @@ class DStarLite:
 
 
     def update_vertex(self, u):
+        inf = float('inf')
         if u != self.goal:
             self.rhs[u] = min(self.c(u, s) + self.g.get(s, inf) for s in self.succ(u))
         if self.g.get(u, inf) != self.rhs.get(u, inf):
@@ -56,24 +54,20 @@ class DStarLite:
         wp_succ = waypoint.next(2.0)
 
         for wp in wp_succ:
-            successor.append(wp)
+            successor.append(self.wp_key(wp))
         return successor
     
     def pred(self, waypoint):
-        for wp in self.waypoints:
-            suc = []
-            wp_key = self.wp_key(wp)
-            wp_succ = waypoint.next(2.0)
+            pred_key = []
+            nor_key = self.wp_key(waypoint)
 
-            for succ in successor:
-                succ_key = self.wp_key(succ)
-                self.pred_dict[succ_key].append(wp)  
-
-        self.rhs[self.wp_key(self.goal)] = 0
-        self.U.insert((self.calculate_key(self.wp_key(self.goal)), self.wp_key(self.goal)))
+            for wp in self.waypoints:
+                if nor_key in self.succ_dict[self.wp_key(wp)]:
+                    pred_key.append(self.wp_key(wp))
+            return pred_key
         
 
-    def ComputeShortestPath(self):
+    def computeshortestpath(self):
         while (self.U.TopKey() < self.calculate_key(self.s_start) or
             self.rhs(self.s_start) > self.g(self.s_start)):
             u = self.U.Top()
@@ -97,13 +91,13 @@ class DStarLite:
                 if self.rhs(s) == self.c(s, u) + g_old:
                     if s != self.s_goal:
                         min_succ = float('inf')
-                        for s_prime in succ:
-                        new = min(self.c(s, s_prime) + self.g(s_prime)
+                        for s_prime in self.succ:
+                            new = min(self.c(s, s_prime) + self.g(s_prime))
 
                             if(min_succ > new):
                                 min_succ = new
                         self.rhs[s] = min_succ
-                self.UpdateVertex(s)
+                    self.UpdateVertex(s)
 
     def c(self, s1, s2):
         wp1 = next(wp for wp in self.waypoints if self.wp_key(wp) == s1)
@@ -111,7 +105,7 @@ class DStarLite:
         return wp1.transform.location.distance(wp2.transform.location)
 
     
-    def main():
+    def main(self):
         client = carla.Client('localhost', 4000)
         client.set_timeout(10.0)
 
@@ -125,10 +119,16 @@ class DStarLite:
         start_waypoint = carla_map.get_waypoint(start_transform.location)
         end_waypoint = carla_map.get_waypoint(end_transform.location)
 
+        s_last = self.wp_key( start_waypoint)
+        s_start = self.wp_key(start_waypoint)
+        s_goal = self.wp_key(end_waypoint)
+
         s_last = s_start
 
-        self.Initialize()
-        self.ComputeShortestPath()
+        self.initialize()
+        self.computeshortestpath()
+
+        inf = float('inf')
 
         while(s_start != s_goal):
             self.s_start = min(self.succ(self.s_start), key=lambda s: self.c(self.s_start, s) + self.g.get(s, inf))
@@ -136,13 +136,13 @@ class DStarLite:
 
             self.scan_graph()
 
-            if c_change():
+            if edge_change():
                 self.km += self.heuristic(self.s_last, self.s_start)
                 self.s_last = self.s_start
 
-                for u,v in self.c_change():
+                for u,v in self.edge_change():
                     c_old = self.c_old(u, v)
-                    self.c_change(u, v)
+                    self.edge_change(u, v)
 
 
                 if(c_old > self.c(u,v)):
@@ -154,4 +154,3 @@ class DStarLite:
 
                 self.UpdateVertex(u)
                 self.ComputeShortestPath()
-
