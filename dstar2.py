@@ -21,9 +21,6 @@ class D_star(object):
         self.resolution = resolution
         self.state_space = self.convert_waypoints(self.waypoints)
 
-        self.print_waypoints()
-        self.print_state_space()
-
         self.x0 = self.get_nearest_state(self.state_space, (0, 0, 0))
         self.xt = self.get_nearest_state(self.state_space, (50, 50, 0))
         self.b = defaultdict(lambda: defaultdict(dict))
@@ -231,16 +228,9 @@ class D_star(object):
             return
 
         if self.Path:
-            next_waypoint = self.Path[0]
-            print("Moving to waypoint")
+            next_waypoint = self.Path.pop()
             location = carla.Location(x=next_waypoint[0][0], y=next_waypoint[0][1], z=next_waypoint[0][2])
             self.vehicle.set_location(location)
-
-            current = self.vehicle.get_location()
-            direction = location - current
-            direction = direction.make_unit_vector()
-
-            
         else:
             print("Path empty.")
 

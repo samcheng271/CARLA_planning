@@ -17,6 +17,9 @@ class DStarLite:
     def heuristic(self, waypoint1, waypoint2):
         return waypoint1.transform.location.distance(waypoint2.transform.location)
 
+    def wp_key(self, waypoint):
+        return (waypoint.transform.location.x, waypoint.transform.location.y, waypoint.transform.location.z)
+
     def calculate_key(self, s):
         if s not in self.g:
             self.g[s] = float('inf')
@@ -37,15 +40,77 @@ class DStarLite:
         self.U.put((self.calculate_key(self.goal), self.goal))
 
 
+    def update_vertex(self, u):
+        if u != self.goal:
+            self.rhs[u] = min(self.c(u, s) + self.g.get(s, inf) for s in self.succ(u))
+        if self.g.get(u, inf) != self.rhs.get(u, inf):
+            if u in self.U:
+                self.U.update(u, self.calculate_key(u))
+            else:
+                self.U.insert(u, self.calculate_key(u))
+        elif (self.g(u) == self.rhs(u) and u in self.U):
+            self.U.remove(u)
 
+    def succ(self, waypoint):
+        successor = []
+        wp_succ = waypoint.next(2.0)
 
+        for wp in wp_succ:
+            successor.append(wp)
+        return successor
+    
+    def pred(self, waypoint):
+        for wp in self.waypoints:
+            suc = []
+            wp_key = self.wp_key(wp)
+            wp_succ = waypoint.next(2.0)
 
+            for succ in successor:
+                succ_key = self.wp_key(succ)
+                self.pred_dict[succ_key].append(wp)  
 
+        self.rhs[self.wp_key(self.goal)] = 0
+        self.U.insert((self.calculate_key(self.wp_key(self.goal)), self.wp_key(self.goal)))
+        
 
+    def ComputeShortestPath(self):
+        while (self.U.TopKey() < self.calculate_key(self.s_start) or
+            self.rhs(self.s_start) > self.g(self.s_start)):
+            u = self.U.Top()
+            k_old = self.U.TopKey()
+            k_new = self.calculate_key(u)
 
+        if k_old < k_new:
+            self.U.Update(u, k_new)
+        elif self.g(u) > self.rhs(u):
+            self.g[u] = self.rhs(u)
+            self.U.Remove(u)
+            #write Pred
+            for s in self.Pred(u):
+                if s != self.s_goal:
+                    self.rhs[s] = min(self.rhs(s), self.c(s, u) + self.g(u))
+                self.UpdateVertex(s)
+        else:
+            g_old = self.g(u)
+            self.g[u] = float('inf')
+            for s in self.Pred(u) | {u}:
+                if self.rhs(s) == self.c(s, u) + g_old:
+                    if s != self.s_goal:
+                        min_succ = float('inf')
+                        for s_prime in succ:
+                        new = min(self.c(s, s_prime) + self.g(s_prime)
 
+                            if(min_succ > new):
+                                min_succ = new
+                        self.rhs[s] = min_succ
+                self.UpdateVertex(s)
 
+    def c(self, s1, s2):
+        wp1 = next(wp for wp in self.waypoints if self.wp_key(wp) == s1)
+        wp2 = next(wp for wp in self.waypoints if self.wp_key(wp) == s2)
+        return wp1.transform.location.distance(wp2.transform.location)
 
+    
     def main():
         client = carla.Client('localhost', 4000)
         client.set_timeout(10.0)
@@ -60,14 +125,33 @@ class DStarLite:
         start_waypoint = carla_map.get_waypoint(start_transform.location)
         end_waypoint = carla_map.get_waypoint(end_transform.location)
 
-        # Get the route
-        # route = DStarLite_route(world, start_waypoint, end_waypoint)
+        s_last = s_start
 
-        # Draws the route the vehicle will follow (red)
-        # for waypoint in route:
-        #     world.debug.draw_string(waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
-        
-        # for waypoint in route:
-        #     vehicle.set_transform(waypoint.transform)
-        #     time.sleep(0.05)
+        self.Initialize()
+        self.ComputeShortestPath()
+
+        while(s_start != s_goal):
+            self.s_start = min(self.succ(self.s_start), key=lambda s: self.c(self.s_start, s) + self.g.get(s, inf))
+            self.move_to(self.s_start)
+
+            self.scan_graph()
+
+            if c_change():
+                self.km += self.heuristic(self.s_last, self.s_start)
+                self.s_last = self.s_start
+
+                for u,v in self.c_change():
+                    c_old = self.c_old(u, v)
+                    self.c_change(u, v)
+
+
+                if(c_old > self.c(u,v)):
+                    if(u != self.s_goal):
+                        self.rhs[u] = min(self.rhs[u], self.c(u,v) + self.g.get(v, inf))
+                elif(self.rhs.get(u, inf) ==  c_old + self.g.get(v, inf)):
+                    if(u != self.s_goal):
+                        self.rhs[u] = min(self.c(u, s_prime) + self.g.get(s_prime, inf) for s_prime in self.succ(u))
+
+                self.UpdateVertex(u)
+                self.ComputeShortestPath()
 
