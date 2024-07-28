@@ -19,13 +19,10 @@ class D_star(object):
             return
 
         self.resolution = resolution
-
-        self.waypoints = self.map.generate_waypoints(self.resolution)
         self.state_space = self.convert_waypoints(self.waypoints)
 
         self.print_waypoints()
         self.print_state_space()
-        self.visualize_waypoints()
 
         self.x0 = self.get_nearest_state(self.state_space, (0, 0, 0))
         self.xt = self.get_nearest_state(self.state_space, (50, 50, 0))
@@ -56,7 +53,10 @@ class D_star(object):
 
     #converts carla waypoints objects into list of x,y,z coordinate tuples 
     def convert_waypoints(self, waypoints):
-        return [(wp.transform.location.x, wp.transform.location.y, wp.transform.location.z) for wp in waypoints]
+        transform = waypoints[0].transform.location
+        return [(wp.transform.location.x - transform.x, 
+                 wp.transform.location.y - transform.y,
+                 wp.transform.location.z - transform.z) for wp in waypoints]
 
     def print_waypoints(self):
         for wp in self.waypoints:
@@ -196,7 +196,7 @@ class D_star(object):
         self.visualize_path(self.Path)
 
         # Handle dynamic environment changes in CARLA
-        for i in range(5):
+        for i in range(20):
             self.move_vehicle()
             s = self.x0
             while s != self.xt:
@@ -231,11 +231,16 @@ class D_star(object):
             return
 
         if self.Path:
-            next_waypoint = self.Path.pop(0)
+            next_waypoint = self.Path[0]
+            print("Moving to waypoint")
             location = carla.Location(x=next_waypoint[0][0], y=next_waypoint[0][1], z=next_waypoint[0][2])
             self.vehicle.set_location(location)
 
-            time.sleep(0.1)
+            current = self.vehicle.get_location()
+            direction = location - current
+            direction = direction.make_unit_vector()
+
+            
         else:
             print("Path empty.")
 
