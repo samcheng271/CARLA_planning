@@ -1,5 +1,4 @@
 import carla
-import random
 import numpy as np
 from collections import defaultdict
 from queue import PriorityQueue
@@ -8,21 +7,8 @@ class D_star(object):
     def __init__(self, waypoint, resolution=1):
         self.settings = 'CollisionChecking'
 
-        try:
-            self.client = carla.Client('localhost', 2000)
-            self.client.set_timeout(10.0)
-            self.world = self.client.get_world()
-            self.map = self.world.get_map()
-            self.waypoints = self.map.generate_waypoints(resolution)
-        except Exception as e:
-            print(f"Failed to connect to Carla: {e}")
-            self.client = None
-            self.world = None
-            self.map = None
-            self.waypoints = []
-            return
-
         self.resolution = resolution
+        self.waypoints = [waypoint]
         self.state_space = self.convert_waypoints(self.waypoints)
 
         # Use actual coordinates from the CARLA map
@@ -41,6 +27,21 @@ class D_star(object):
         self.done = False
         self.Obstaclemap = {}
         self.init_vehicle()
+
+
+        try:
+            self.client = carla.Client('localhost', 2000)
+            self.client.set_timeout(10.0)
+            self.world = self.client.get_world()
+            self.map = self.world.get_map()
+            self.waypoints = self.map.generate_waypoints(resolution)
+        except Exception as e:
+            print(f"Failed to connect to Carla: {e}")
+            self.client = None
+            self.world = None
+            self.map = None
+            self.waypoints = []
+            return
 
     def init_vehicle(self):
         try:
@@ -253,7 +254,7 @@ class D_star(object):
     
     def run(self):
         
-        #self.OPEN.put((self.h(self.x0, self.xt), self.x0))
+        self.OPEN.put((self.h(self.x0, self.xt), self.x0))
         self.tag[self.x0] = 'Open'
         while self.tag.get(self.xt, 'New') != "Closed":
             kmin = self.process_state()
