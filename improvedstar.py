@@ -11,44 +11,46 @@ class D_star(object):
         self.settings = 'CollisionChecking'
         self.resolution = resolution
         self.waypoint = waypoint
-        
-        self.client = carla.Client('localhost', 2000)
-        self.client.set_timeout(10.0)
-        self.world = self.client.get_world()
-        self.map = self.world.get_map()
-            
-         #this is already initalizing vehicle to a starting locaiton
-        vehicle_bp = self.world.get_blueprint_library().filter('vehicle.*')[0]
-        spawn_points = self.world.get_map().get_spawn_points()
-        start_spawn = spawn_points[0]
-        vehicle = self.world.try_spawn_actor(vehicle_bp, start_spawn)
+        try:
+            self.client = carla.Client('localhost', 2000)
+            self.client.set_timeout(10.0)
+            self.world = self.client.get_world()
+            self.map = self.world.get_map()
+                
+            #this is already initalizing vehicle to a starting locaiton
+            vehicle_bp = self.world.get_blueprint_library().filter('vehicle.carlamotors.firetruck')[0]
+            spawn_points = self.world.get_map().get_spawn_points()
+            start_spawn = spawn_points[0]
+            vehicle = self.world.spawn_actor(vehicle_bp, start_spawn)
 
-        self.vehicle = vehicle
-        self.state = self.waypoint
-        self.state_space = self.vehicle.get_waypoint(self.vehicle.get_location())
-        self.waypoints = self.map.generate_waypoints(self.resolution)
+            self.vehicle = vehicle
+            print("Vehicle spawned.", vehicle.get_location())
+            self.state = self.waypoint
+            self.state_space = self.map.get_waypoint(self.vehicle.get_location())
+            self.waypoints = self.map.generate_waypoints(self.resolution)
 
-        wp_tuple = self.init_vehicle(parameters)
-        if wp_tuple:
-            start_location, goal_location = wp_tuple
-        self.start_location = start_location
-        self.goal_location = goal_location
-        #self.start_location = self.init_vehicle.parameters[0]
-        #self.goal_location = self.init_vehicle.parameters[1]
-        self.x0 = self.get_nearest_state(self.start_location)
-        self.xt = self.get_nearest_state(self.goal_location)
-        self.b = defaultdict(lambda: defaultdict(dict))
-        self.OPEN = []
-        self.h = {}
-        self.tag = {}
-        self.V = set()
-        self.parameters = ()
-        self.ind = 0
-        self.Path = []
-        self.done = False
-        self.Obstaclemap = {}
-        self.obstacle_threshold = 5.0
-
+            wp_tuple = self.init_vehicle(parameters)
+            if wp_tuple:
+                start_location, goal_location = wp_tuple
+            self.start_location = start_location
+            self.goal_location = goal_location
+            #self.start_location = self.init_vehicle.parameters[0]
+            #self.goal_location = self.init_vehicle.parameters[1]
+            self.x0 = self.get_nearest_state(self.start_location)
+            self.xt = self.get_nearest_state(self.goal_location)
+            self.b = defaultdict(lambda: defaultdict(dict))
+            self.OPEN = []
+            self.h = {}
+            self.tag = {}
+            self.V = set()
+            self.parameters = ()
+            self.ind = 0
+            self.Path = []
+            self.done = False
+            self.Obstaclemap = {}
+            self.obstacle_threshold = 5.0
+        finally:
+            vehicle.destroy()
         #make sure if a initalization function is being called here, that anything that might be used w init variables are 
         #initalized also properly. 
         # self.init_vehicle()
@@ -258,7 +260,7 @@ class D_star(object):
     def children(self, state):
         children = []
         #get vehicle's current location
-        location = vehicle.get_location()
+        location = self.vehicle.get_location()
         current_waypoint = self.map.get_waypoint(location, project_to_road=True) 
 
         if current_waypoint is None:
