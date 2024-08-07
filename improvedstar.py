@@ -11,46 +11,46 @@ class D_star(object):
         self.settings = 'CollisionChecking'
         self.resolution = resolution
         self.waypoint = waypoint
-        try:
-            self.client = carla.Client('localhost', 2000)
-            self.client.set_timeout(10.0)
-            self.world = self.client.get_world()
-            self.map = self.world.get_map()
-                
-            #this is already initalizing vehicle to a starting locaiton
-            vehicle_bp = self.world.get_blueprint_library().filter('vehicle.carlamotors.firetruck')[0]
-            spawn_points = self.world.get_map().get_spawn_points()
-            start_spawn = spawn_points[0]
-            vehicle = self.world.spawn_actor(vehicle_bp, start_spawn)
+        self.obstacle_threshold = 5.0
+        self.b = defaultdict(lambda: defaultdict(dict))
+        self.OPEN = []
+        self.h = {}
+        self.tag = {}
+        self.V = set()
+        self.parameters = ()
+        self.ind = 0
+        self.Path = []
+        self.done = False
+        self.Obstaclemap = {}
+    
+        self.client = carla.Client('localhost', 2000)
+        self.client.set_timeout(10.0)
+        self.world = self.client.get_world()
+        self.map = self.world.get_map()
+            
+        #this is already initalizing vehicle to a starting locaiton
+        vehicle_bp = self.world.get_blueprint_library().filter('vehicle.carlamotors.firetruck')[0]
+        self.spawn_points = self.world.get_map().get_spawn_points()
+        self.start_spawn = self.spawn_points[0]
+        vehicle = self.world.spawn_actor(vehicle_bp, self.start_spawn)
 
-            self.vehicle = vehicle
-            print("Vehicle spawned.", vehicle.get_location())
-            self.state = self.waypoint
-            self.state_space = self.map.get_waypoint(self.vehicle.get_location())
-            self.waypoints = self.map.generate_waypoints(self.resolution)
+        self.vehicle = vehicle
+        # print("Vehicle spawned.", vehicle.get_location())
+        self.state = self.waypoint
+        self.state_space = self.map.get_waypoint(self.vehicle.get_location())
+        self.waypoints = self.map.generate_waypoints(self.resolution)
 
-            wp_tuple = self.init_vehicle(parameters)
-            if wp_tuple:
-                start_location, goal_location = wp_tuple
-            self.start_location = start_location
-            self.goal_location = goal_location
-            #self.start_location = self.init_vehicle.parameters[0]
-            #self.goal_location = self.init_vehicle.parameters[1]
-            self.x0 = self.get_nearest_state(self.start_location)
-            self.xt = self.get_nearest_state(self.goal_location)
-            self.b = defaultdict(lambda: defaultdict(dict))
-            self.OPEN = []
-            self.h = {}
-            self.tag = {}
-            self.V = set()
-            self.parameters = ()
-            self.ind = 0
-            self.Path = []
-            self.done = False
-            self.Obstaclemap = {}
-            self.obstacle_threshold = 5.0
-        finally:
-            vehicle.destroy()
+        wp_tuple = self.init_vehicle()
+        if wp_tuple:
+            start_location, goal_location = wp_tuple
+        self.start_location = start_location
+        self.goal_location = goal_location
+        #self.start_location = self.init_vehicle.parameters[0]
+        #self.goal_location = self.init_vehicle.parameters[1]
+        self.x0 = self.get_nearest_state(self.start_location)
+        self.xt = self.get_nearest_state(self.goal_location)
+        
+    
         #make sure if a initalization function is being called here, that anything that might be used w init variables are 
         #initalized also properly. 
         # self.init_vehicle()
@@ -64,7 +64,7 @@ class D_star(object):
             heapq.heappush(self.OPEN, tup)
         return self.OPEN
     
-    def init_vehicle(self, parameters):
+    def init_vehicle(self):
         try:
             if self.vehicle:
                 print("Vehicle spawned.")
@@ -81,14 +81,14 @@ class D_star(object):
         while goal_vehicle.location == self.start_spawn.location:
             goal_vehicle = random.choice(self.spawn_points)
 
-        start_waypoint = self.map.get_waypoint(self.start_spawn.location)
-        end_waypoint = self.map.get_waypoint(goal_vehicle.location)
+        start_waypoint = self.map.get_waypoint(self.start_spawn.location, project_to_road=True)
+        end_waypoint = self.map.get_waypoint(goal_vehicle.location, project_to_road=True)
 
-        waypoint_a = self.map.get_waypoint(self.start_spawn, project_to_road=True)
-        waypoint_b = self.map.get_waypoint(goal_vehicle, project_to_road=True)
+        # waypoint_a = self.map.get_waypoint(self.start_spawn, project_to_road=True)
+        # waypoint_b = self.map.get_waypoint(goal_vehicle, project_to_road=True)
 
-        start_waypoint = waypoint_a
-        end_waypoint = waypoint_b
+        # start_waypoint = waypoint_a
+        # end_waypoint = waypoint_b
 
         start_end = (start_waypoint, end_waypoint)
         return start_end
@@ -105,7 +105,8 @@ class D_star(object):
 
         #gets the state_space nearest to vehicle 
         for state in self.waypoints:
-            state_location = carla.Location(x=state[0], y=state[1], z=state[2])
+            # print('statex:: ',state.transform.location.x)
+            state_location = carla.Location(x=state.transform.location.x, y=state.transform.location.y, z=state.transform.location.z)
             distance = vehicle_location.distance(state_location)
 
             if distance < min_distance and distance > 5:
@@ -114,7 +115,7 @@ class D_star(object):
 
         
         if nearest_state:
-            nearest_location = carla.Location(x=nearest_state[0], y=nearest_state[1], z=nearest_state[2])
+            nearest_location = carla.Location(x=state.transform.location.x, y=state.transform.location.y, z=state.transform.location.z)
             min_dist = float('inf')
             for actor in self.world.get_actors():
                 if isinstance(actor, carla.Vehicle) and actor.id != self.vehicle.id:  
@@ -155,7 +156,7 @@ class D_star(object):
         return None
 
     
-    def min_state(self, state_space):
+    def min_state(self):
         if self.OPEN:
             self.populate_open()
             min_element = heapq.heappop(self.OPEN)
@@ -306,7 +307,7 @@ class D_star(object):
     
     def run(self):
         
-        self.OPEN.put((self.cost(self.x0, self.xt), self.x0))
+        self.OPEN.append((self.cost(self.x0, self.xt), self.x0))
         self.tag[self.x0] = 'Open'
         while self.tag.get(self.xt, 'New') != "Closed":
             kmin = self.process_state()
@@ -355,7 +356,9 @@ class D_star(object):
             )
 
 if __name__ == '__main__':
-    D = D_star(1)
-    D.run()
-
+    try:
+        D = D_star(1)
+        D.run()
+    finally:
+        D.vehicle.destroy()
 
