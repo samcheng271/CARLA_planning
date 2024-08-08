@@ -219,7 +219,7 @@ class D_star(object):
                         (self.b[y] == x and self.h[y] != bb) or \
                         (self.b[y] != x and self.h[y] > bb):
                     self.b[y] = x
-                                       self.insert(bb, y)
+                    self.insert(bb, y)
         else:
             for y in self.children(self, x):
                  # check y
