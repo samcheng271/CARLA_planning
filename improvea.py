@@ -18,7 +18,6 @@ class D_star(object):
         self.tag = {}
         self.V = set()
         self.parameters = ()
-        self.wp_list = self.convert_waypoints(resolution)
         self.ind = 0
         self.Path = []
         self.done = False
@@ -49,8 +48,12 @@ class D_star(object):
         self.goal_location = goal_location
         #self.start_location = self.init_vehicle.parameters[0]
         #self.goal_location = self.init_vehicle.parameters[1]
-        self.x0 = self.get_nearest_state(self.start_location)
-        self.xt = self.get_nearest_state(self.goal_location)
+
+        #self.x0 = self.get_nearest_state(self.start_location)
+        #self.xt = self.get_nearest_state(self.goal_location)
+        self.x0 = self.start_location.next(1.0)
+        self.xt = self.goal_location.next(1.0)
+
 
 
         #make sure if a initalization function is being called here, that anything that might be used w init variables are
@@ -176,9 +179,10 @@ class D_star(object):
         tag = self.tag.get(x, 'New')
 
         if h_new is None:
-            vehicle_transform = self.vehicle.transform
-            vehicle_location = vehicle_transform.location
-            h_new = self.cost(self.vehicle_location, x)
+            vehicle_location = self.vehicle.get_location()
+            v_waypoint = world.get_map().get_waypoint(vehicle_location, project_to_road=True)
+            #change first parameter to a waypoint
+            h_new = self.cost(v_waypoint, x)
 
         if tag == 'New':
             kx = h_new
@@ -219,7 +223,7 @@ class D_star(object):
                         (self.b[y] == x and self.h[y] != bb) or \
                         (self.b[y] != x and self.h[y] > bb):
                     self.b[y] = x
-                                       self.insert(bb, y)
+                    self.insert(bb, y)
         else:
             for y in self.children(self, x):
                  # check y
@@ -238,7 +242,7 @@ class D_star(object):
                             self.insert(self.h[y], y)
         return self.get_kmin()
 
-    def modify_cost(self, state_space):
+    def modify_cost(self):
         #x is a state; initialize it to a state->waypoint, more specifically the current wp
         location = self.vehicle.get_location()
         current_wp = self.map.get_waypoint(location, project_to_road=True)
@@ -274,21 +278,21 @@ class D_star(object):
 
         for next_wp in current_waypoint.next(2.0):
             next_state = (next_wp.transform.location.x, next_wp.transform.location.y, next_wp.transform.location.z)
-            if next_state in self.wp_list:
+            if next_state in self.waypoints:
                 children.append(next_state)
 
         if current_waypoint.lane_change & carla.LaneChange.Left:
             left_wp = current_waypoint.get_left_lane()
             if left_wp and left_wp.lane_type == carla.LaneType.Driving:
                 left_state = (left_wp.transform.location.x, left_wp.transform.location.y, left_wp.transform.location.z)
-                if left_state in self.wp_list:
+                if left_state in self.waypoints:
                     children.append(left_state)
 
         if current_waypoint.lane_change & carla.LaneChange.Right:
             right_wp = current_waypoint.get_right_lane()
             if right_wp and right_wp.lane_type == carla.LaneType.Driving:
                 right_state = (right_wp.transform.location.x, right_wp.transform.location.y, right_wp.transform.location.z)
-                if right_state in self.wp_list:
+                if right_state in self.waypoints:
                     children.append(right_state)
 
         return children
