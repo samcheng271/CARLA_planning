@@ -44,15 +44,19 @@ class D_star(object):
         wp_tuple = self.init_vehicle()
         if wp_tuple:
             start_location, goal_location = wp_tuple
+        # print(f'start_location = {start_location}, goal_location = {goal_location}')
         self.start_location = start_location
         self.goal_location = goal_location
         #self.start_location = self.init_vehicle.parameters[0]
         #self.goal_location = self.init_vehicle.parameters[1]
 
-        #self.x0 = self.get_nearest_state(self.start_location)
-        #self.xt = self.get_nearest_state(self.goal_location)
-        self.x0 = self.start_location.next(1.0)
-        self.xt = self.goal_location.next(1.0)
+        self.x0 = self.map.get_waypoint(self.start_location.transform.location)
+        self.xt = self.map.get_waypoint(self.goal_location.transform.location)
+        # self.x0 = self.get_nearest_state(self.start_location)
+        # self.xt = self.get_nearest_state(self.goal_location)
+        # self.x0 = self.start_location.next(1.0)
+        # self.xt = self.goal_location.next(1.0)
+        # print(f'self.x0 = {self.x0} : self.xt = {self.xt}')
 
 
 
@@ -64,9 +68,10 @@ class D_star(object):
         if not self.vehicle:
             return []
         #self.key = self.cost(self.vehicle.get_location(), self.get_nearest_state(self.state_space))
-        vehicle_transform = self.vehicle.transform
-        vehicle_location = vehicle_transform.location
-        self.key = self.cost(self.vehicle_location, self.get_nearest_state(self.waypoint))
+
+        self.vehicle_location = self.vehicle.get_location()
+        vehicle_waypoint = self.map.get_waypoint(self.vehicle_location, project_to_road=True)
+        self.key = self.cost(vehicle_waypoint, self.get_nearest_state(self.waypoint))
         tup = (self.key, self.state_space)
         for wp in self.waypoints:
             heapq.heappush(self.OPEN, tup)
@@ -201,34 +206,38 @@ class D_star(object):
     def process_state(self):
         x, kold = self.min_state()
 
-        self.tag[x] = 'Closed'
+        # print(f'x: {x}, kold: {kold}')
+        self.tag[x.id] = 'Closed'
         self.V.add(x)
         if x is None:
             return -1
         # check if 1st timer s
         self.checkState(x)
-        if kold < self.h[x]:  # raised states
+        # print(f'x: {x}, kold: {kold}')
+        # print(f'h: {self.h}')
+        # print(f'b: {self.b}')
+        if kold < self.h[x.id]:  # raised states
             for y in self.children(x):
                 # check y
                 self.checkState(y)
                 a = self.h[y] + self.cost(self, y, x)
                 if self.h[y] <= kold and self.h[x] > a:
                     self.b[x], self.h[x] = y, a
-        if kold == self.h[x]:  # lower
-            for y in self.children(self, x):
+        if kold == self.h[x.id]:  # lower
+            for y in self.children(x):
                 # check y
                 self.checkState(y)
-                bb = self.h[x] + self.cost(self, x, y)
+                bb = self.h[x] + self.cost(x, y)
                 if self.tag[y] == 'New' or \
                         (self.b[y] == x and self.h[y] != bb) or \
                         (self.b[y] != x and self.h[y] > bb):
                     self.b[y] = x
                     self.insert(bb, y)
         else:
-            for y in self.children(self, x):
+            for y in self.children(x):
                  # check y
                 self.checkState(y)
-                bb = self.h[x] + self.cost(self, x, y)
+                bb = self.h[x] + self.cost(x, y)
                 if self.tag[y] == 'New' or \
                         (self.b[y] == x and self.h[y] != bb):
                     self.b[y] = x
@@ -262,9 +271,13 @@ class D_star(object):
                 break
 
     def cost(self, start, goal):
-        g_tuple = tuple(goal)
-        if g_tuple in self.Obstaclemap:
+        # print(f'start: {start}, goal: {goal}')
+        # g_tuple = tuple(goal)
+        if goal.id in self.Obstaclemap:
             return np.inf
+        # s = start[0]
+        # g= goal[0]
+        # print(f'start: {start}, goal: {goal[0]}')
         #return carla.Location(x=start[0], y=start[1], z=start[2]).distance(carla.Location(x=goal[0], y=goal[1], z=goal[2]))
         return start.transform.location.distance(goal.transform.location)
 
@@ -318,9 +331,12 @@ class D_star(object):
     def run(self):
 
         heapq.heappush(self.OPEN, (self.cost(self.x0, self.xt), self.x0))
-        self.tag[self.x0] = 'Open'
-        while self.tag.get(self.xt, 'New') != "Closed":
+        print(f'self.tag: {self.tag}')
+        print(f'self.x0: {self.x0}')
+        self.tag[self.x0.id] = 'Open'
+        while self.tag.get(self.xt.id, 'New') != "Closed":
             kmin = self.process_state()
+            print(f'kmin: {kmin}')
             if kmin == -1:
                 print("No path found.")
                 return
