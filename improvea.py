@@ -132,7 +132,7 @@ class D_star(object):
                         # If an obstacle is too close, mark this state as invalid
                         min_dist = min(min_dist, obs_location.distance(nearest_location))
             if min_dist < self.obstacle_threshold:
-                self.Obstaclemap[nearest_state] = True
+                self.Obstaclemap[nearest_state.id] = True
                 return None
 
         return nearest_state
@@ -262,7 +262,8 @@ class D_star(object):
                 break
 
     def cost(self, start, goal):
-        if goal in self.Obstaclemap:
+        g_tuple = tuple(goal)
+        if g_tuple in self.Obstaclemap:
             return np.inf
         #return carla.Location(x=start[0], y=start[1], z=start[2]).distance(carla.Location(x=goal[0], y=goal[1], z=goal[2]))
         return start.transform.location.distance(goal.transform.location)
