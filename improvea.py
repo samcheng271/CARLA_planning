@@ -204,14 +204,22 @@ class D_star(object):
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
+        if not self.OPEN:
+            print("Open is empty")
+            return -1
         x, kold = self.min_state()
+        if x is None:
+            print("No valid state")
+            return -1 
 
         # print(f'x: {x}, kold: {kold}')
         self.tag[x.id] = 'Closed'
         self.V.add(x)
-        if x is None:
+        
+        if x.id == self.xt.id:
+            print("goal reached")
             return -1
-        # check if 1st timer s
+        
         self.checkState(x)
         # print(f'x: {x}, kold: {kold}')
         # print(f'h: {self.h}')
@@ -249,6 +257,7 @@ class D_star(object):
                         if self.b[y] != x and self.h[y] > bb and \
                                 self.tag[y] == 'Closed' and self.h[y] == kold:
                             self.insert(self.h[y], y)
+        print("No min")
         return self.get_kmin()
 
     def modify_cost(self):
@@ -333,8 +342,8 @@ class D_star(object):
         heapq.heappush(self.OPEN, (self.cost(self.x0, self.xt), self.x0))
         print(f'self.tag: {self.tag}')
         print(f'self.x0: {self.x0}')
-        self.tag[self.x0.id] = 'Open'
         while self.tag.get(self.xt.id, 'New') != "Closed":
+            print(f"Goal state tag: {self.tag.get(self.xt.id, 'New')}") 
             kmin = self.process_state()
             print(f'kmin: {kmin}')
             if kmin == -1:
@@ -357,6 +366,10 @@ class D_star(object):
                 s = sparent
             self.Path = self.path()
             self.visualize_path(self.Path)
+
+            if s == self.x0:
+                print("Path was reconstructed")
+                break
 
     #controls vehicle to be moved from one place to another
     def move_vehicle(self):
