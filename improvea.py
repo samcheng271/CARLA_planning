@@ -38,7 +38,9 @@ class D_star(object):
         self.vehicle = vehicle
         # print("Vehicle spawned.", vehicle.get_location())
         self.state = self.waypoint
-        self.state_space = self.map.get_waypoint(self.vehicle.get_location())
+        self.location = self.vehicle.get_location()
+        self.state_space = self.map.get_waypoint(location, project_to_road=True)
+        #self.state_space = self.map.get_waypoint(self.vehicle.get_location())
         self.waypoints = self.map.generate_waypoints(self.resolution)
         
 
@@ -70,10 +72,11 @@ class D_star(object):
             return []
         #self.key = self.cost(self.vehicle.get_location(), self.get_nearest_state(self.state_space))
 
-        self.vehicle_location = self.vehicle.get_location()
-        vehicle_waypoint = self.map.get_waypoint(self.vehicle_location, project_to_road=True)
-        self.key = self.cost(vehicle_waypoint, self.get_nearest_state(self.waypoint))
-        tup = (self.key, self.state_space)
+        #self.vehicle_location = self.vehicle.get_location()
+        #vehicle_waypoint = self.map.get_waypoint(self.vehicle_location, project_to_road=True)
+        #self.key = self.cost(vehicle_waypoint, self.get_nearest_state(self.waypoint))
+        self.key = self.cost(state_space, self.get_nearest_state(self.waypoint))
+        tup = (self.state_space, self.key)
         for wp in self.waypoints:
             heapq.heappush(self.OPEN, tup)
         return self.OPEN
@@ -166,13 +169,13 @@ class D_star(object):
         if self.OPEN:
             self.populate_open()
             minimum = heapq.heappop(self.OPEN)  # Pop and return the tuple with the minimum key value
-            return minimum[0]
+            return minimum[1]
         
     def min_state(self):
         if self.OPEN:
             self.populate_open()
             min_element = heapq.heappop(self.OPEN)
-            return min_element[1], min_element[0] #returns state k with associated key value
+            return min_element[0], min_element[1] #returns state k with associated key value
         return None, -1
 
     def get_wpid(self, waypoint_id):
@@ -184,20 +187,21 @@ class D_star(object):
     #check again
     def insert(self, state, h_new):
         #x is a state
-        if isinstance(state, carla.Waypoint):
-                waypoint_id = state.id
-            else:
-                waypoint_id = state
+        #if isinstance(state, carla.Waypoint):
+        waypoint_id = state.id
+        #else:
+            #waypoint_id = state
 
         if h_new is None:
             #here x is an id initalization but cost is being performed between a waypoint and a waypoint id 
             state_location = world.get_map().get_wpid(waypoint_id).transform.location
             #state.get_location()
             #state_waypoint = world.get_map().get_waypoint(state_location, project_to_road=True)
-            vehicle_location = self.vehicle.get_location()
-            v_waypoint = world.get_map().get_waypoint(vehicle_location, project_to_road=True)
+
+            #vehicle_location = self.vehicle.get_location()
+            #v_waypoint = world.get_map().get_waypoint(vehicle_location, project_to_road=True)
             #change first parameter to a waypoint
-            h_new = self.cost(v_waypoint, state_location)
+            h_new = self.cost(self.state_space, state_location)
             #tag state here is always getting initalized to "new"
             #tag = self.tag.get(x, 'New')
             
@@ -217,40 +221,14 @@ class D_star(object):
         heapq.heappush(self.OPEN, (kx, state))
         self.h[waypoint_id], self.tag[waypoint_id] = h_new, 'Open'
 
-    def insert(self, x, h_new=None):
-        if isinstance(x, carla.Waypoint):
-            waypoint_id = x.id
-        else:
-            waypoint_id = x
-        #tag state here is always getting initalized to "new"
-        tag = self.tag.get(x, 'New')
-
-        if h_new is None:
-            #here x is an id initalization but cost is being performed between a waypoint and a waypoint id 
-            vehicle_location = self.vehicle.get_location()
-            v_waypoint = world.get_map().get_waypoint(vehicle_location, project_to_road=True)
-            #change first parameter to a waypoint
-            h_new = self.cost(v_waypoint, x)
-
-        if self.tag == 'New':
-            kx = h_new
-            #analyze Open case
-        elif tag == 'Open':
-            kx = min(self.h.get(x, float('inf')), h_new)
-        elif tag == 'Closed':
-            kx = min(self.h.get(x, float('inf')), h_new)
-        else:
-            kx = h_new
-
-        heapq.heappush(self.OPEN, (kx, x))
-        self.h[x], self.tag[x] = h_new, 'Open'
-
     #see how process state goes through obstacle avoidance
     def process_state(self):
         if not self.OPEN:
             print("Open is empty")
             return -1
-        x, kold = self.min_state()
+        #x is a state, kold is key
+        #x, kold = self.min_state()
+        kold, x = self.min_state()
         if x is None:
             print("No valid state")
             return -1 
@@ -283,7 +261,7 @@ class D_star(object):
                         (self.b[y] == x and self.h[y] != bb) or \
                         (self.b[y] != x and self.h[y] > bb):
                     self.b[y] = x
-                    self.insert(bb, y)
+                    self.insert(y, bb)
         else:
             for y in self.children(x):
                  # check y
@@ -292,34 +270,34 @@ class D_star(object):
                 if self.tag[y] == 'New' or \
                         (self.b[y] == x and self.h[y] != bb):
                     self.b[y] = x
-                    self.insert(bb, y)
+                    self.insert(y, bb)
                 else:
                     if self.b[y] != x and self.h[y] > bb:
-                        self.insert(self.h[x], x)
+                        self.insert(x, self.h[x])
                     else:
                         if self.b[y] != x and self.h[y] > bb and \
                                 self.tag[y] == 'Closed' and self.h[y] == kold:
-                            self.insert(self.h[y], y)
+                            self.insert(y, self.h[y])
         print("No min")
         return self.get_kmin()
 
     def modify_cost(self):
         #x is a state; initialize it to a state->waypoint, more specifically the current wp
-        location = self.vehicle.get_location()
-        current_wp = self.map.get_waypoint(location, project_to_road=True)
+        #location = self.vehicle.get_location()
+        #current_wp = self.map.get_waypoint(location, project_to_road=True)
         #b is a backpointer-holder-gets the pred of current state
-        xparent = self.b[current_wp]
-        if self.tag[current_wp] == 'Closed':
-            self.insert(self.h[xparent] + self.cost(current_wp, xparent), current_wp)
+        xparent = self.b[self.state_space]
+        if self.tag[self.state_space] == 'Closed':
+            self.insert(current_wp, self.h[xparent] + self.cost(current_wp, xparent))
 
     def modify(self, state_space):
         #x is a state; initialize it to a state->waypoint, more specifically the current wp
-        location = self.vehicle.get_location()
-        current_wp = self.map.get_waypoint(location, project_to_road=True)
-        self.modify_cost(current_wp)
+        #location = self.vehicle.get_location()
+        #current_wp = self.map.get_waypoint(location, project_to_road=True)
+        self.modify_cost(state_space)
         while True:
             kmin = self.process_state()
-            if kmin >= self.h[current_wp]:
+            if kmin >= self.h[state_space]:
                 break
 
     def cost(self, start, goal):
