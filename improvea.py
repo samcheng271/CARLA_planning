@@ -39,7 +39,7 @@ class D_star(object):
         # print("Vehicle spawned.", vehicle.get_location())
         self.state = self.waypoint
         self.location = self.vehicle.get_location()
-        self.state_space = self.map.get_waypoint(location, project_to_road=True)
+        self.state_space = self.map.get_waypoint(self.location, project_to_road=True)
         #self.state_space = self.map.get_waypoint(self.vehicle.get_location())
         self.waypoints = self.map.generate_waypoints(self.resolution)
         
@@ -75,7 +75,7 @@ class D_star(object):
         #self.vehicle_location = self.vehicle.get_location()
         #vehicle_waypoint = self.map.get_waypoint(self.vehicle_location, project_to_road=True)
         #self.key = self.cost(vehicle_waypoint, self.get_nearest_state(self.waypoint))
-        self.key = self.cost(state_space, self.get_nearest_state(self.waypoint))
+        self.key = self.cost(self.state_space, self.get_nearest_state(self.waypoint))
         tup = (self.state_space, self.key)
         for wp in self.waypoints:
             heapq.heappush(self.OPEN, tup)
@@ -288,7 +288,7 @@ class D_star(object):
         #b is a backpointer-holder-gets the pred of current state
         xparent = self.b[self.state_space]
         if self.tag[self.state_space] == 'Closed':
-            self.insert(current_wp, self.h[xparent] + self.cost(current_wp, xparent))
+            self.insert(self.state_space, self.h[xparent] + self.cost(self.state_space, xparent))
 
     def modify(self, state_space):
         #x is a state; initialize it to a state->waypoint, more specifically the current wp
