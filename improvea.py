@@ -6,6 +6,7 @@ from collections import defaultdict
 from queue import PriorityQueue
 
 #write a separate file
+#consider move-robot
 class D_star(object):
     def __init__(self, waypoint, resolution=0.5):
         self.settings = 'CollisionChecking'
@@ -174,22 +175,64 @@ class D_star(object):
             return min_element[1], min_element[0] #returns state k with associated key value
         return None, -1
 
+    def get_wpid(self, waypoint_id):
+        for waypoint in self.waypoints:
+            if waypoint.id == waypoint_id:
+                return waypoint
+        return None 
+    
     #check again
+    def insert(self, state, h_new):
+        #x is a state
+        if isinstance(state, carla.Waypoint):
+                waypoint_id = state.id
+            else:
+                waypoint_id = state
+
+        if h_new is None:
+            #here x is an id initalization but cost is being performed between a waypoint and a waypoint id 
+            state_location = world.get_map().get_wpid(waypoint_id).transform.location
+            #state.get_location()
+            #state_waypoint = world.get_map().get_waypoint(state_location, project_to_road=True)
+            vehicle_location = self.vehicle.get_location()
+            v_waypoint = world.get_map().get_waypoint(vehicle_location, project_to_road=True)
+            #change first parameter to a waypoint
+            h_new = self.cost(v_waypoint, state_location)
+            #tag state here is always getting initalized to "new"
+            #tag = self.tag.get(x, 'New')
+            
+        if waypoint_id in self.tag:
+            tag = self.tag[waypoint_id]
+        else: 
+            tag = 'New'
+
+        if tag == 'New':
+            kx = h_new
+            #analyze Open case
+        if tag == 'Open':
+            kx = min(self.h.get(state, float('inf')), h_new)
+        if tag == 'Closed':
+            kx = min(self.h.get(state, float('inf')), h_new)
+        
+        heapq.heappush(self.OPEN, (kx, state))
+        self.h[waypoint_id], self.tag[waypoint_id] = h_new, 'Open'
+
     def insert(self, x, h_new=None):
         if isinstance(x, carla.Waypoint):
             waypoint_id = x.id
         else:
             waypoint_id = x
-
+        #tag state here is always getting initalized to "new"
         tag = self.tag.get(x, 'New')
 
         if h_new is None:
+            #here x is an id initalization but cost is being performed between a waypoint and a waypoint id 
             vehicle_location = self.vehicle.get_location()
             v_waypoint = world.get_map().get_waypoint(vehicle_location, project_to_road=True)
             #change first parameter to a waypoint
             h_new = self.cost(v_waypoint, x)
 
-        if tag == 'New':
+        if self.tag == 'New':
             kx = h_new
             #analyze Open case
         elif tag == 'Open':
