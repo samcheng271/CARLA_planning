@@ -3,7 +3,9 @@ import carla
 import numpy as np
 import random
 from collections import defaultdict
-from queue import PriorityQueue
+# from queue import PriorityQueue
+from PriorityQueue import PriorityQueue, Priority # Make sure you have PriorityQueue.py 
+# and that the built in queue module is commented out
 
 #write a separate file
 #consider move-robot
@@ -23,6 +25,7 @@ class D_star(object):
         self.Path = []
         self.done = False
         self.Obstaclemap = {}
+        heapq.heapify(self.OPEN)
 
         self.client = carla.Client('localhost', 2000)
         self.client.set_timeout(10.0)
@@ -79,6 +82,7 @@ class D_star(object):
         tup = (self.state_space, self.key)
         for wp in self.waypoints:
             heapq.heappush(self.OPEN, tup)
+            print(f'pushed {tup}')
         return self.OPEN
 
     def init_vehicle(self):
