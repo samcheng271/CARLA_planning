@@ -41,6 +41,7 @@ class D_star(object):
 
         self.vehicle = vehicle
         # print("Vehicle spawned.", vehicle.get_location())
+        #1. check if should not be used here->vehicle waypoint initalization
         self.state = self.waypoint
         self.location = self.vehicle.get_location()
         self.state_space = self.map.get_waypoint(self.location, project_to_road=True)
@@ -66,7 +67,7 @@ class D_star(object):
             return []
     
         self.key = self.cost(self.state_space, self.get_nearest_state(self.waypoint))
-        tup = (self.state_space, self.key)
+        tup = (self.key, self.state_space)
         self.OPEN.put(tup)
         print(f'pushed {tup}')
             
@@ -75,6 +76,7 @@ class D_star(object):
     def init_vehicle(self):
         try:
             if self.vehicle:
+                #self.vehicle is initalized 
                 print("Vehicle spawned.")
             else:
                 print("Failed to spawn.")
@@ -145,7 +147,7 @@ class D_star(object):
         if self.OPEN:
             self.populate_open()
             minimum = self.OPEN.get() # Pop and return the tuple with the minimum key value
-            return minimum[1]
+            return minimum[0]
         
     def min_state(self):
         if self.OPEN:
@@ -161,7 +163,7 @@ class D_star(object):
         return None 
     
     #check again
-    def insert(self, state, h_new):
+    def insert(self, h_new, state):
         #x is a state
         #if isinstance(state, carla.Waypoint):
         waypoint_id = state.id
@@ -169,7 +171,6 @@ class D_star(object):
             #waypoint_id = state
 
         if h_new is None:
-            #here x is an id initalization but cost is being performed between a waypoint and a waypoint id 
             state_location = self.world.get_map().get_wpid(waypoint_id).transform.location
             h_new = self.cost(self.state_space, state_location)
             
@@ -236,7 +237,7 @@ class D_star(object):
                         (self.b[y] == x and self.h[y] != bb) or \
                         (self.b[y] != x and self.h[y] > bb):
                     self.b[y] = x
-                    self.insert(y, bb)
+                    self.insert(bb, y)
         else:
             for y in self.children(x):
                  # check y
@@ -245,21 +246,21 @@ class D_star(object):
                 if self.tag[y] == 'New' or \
                         (self.b[y] == x and self.h[y] != bb):
                     self.b[y] = x
-                    self.insert(y, bb)
+                    self.insert(bb, y)
                 else:
                     if self.b[y] != x and self.h[y] > bb:
-                        self.insert(x, self.h[x])
+                        self.insert(self.h[x], x)
                     else:
                         if self.b[y] != x and self.h[y] > bb and \
                                 self.tag[y] == 'Closed' and self.h[y] == kold:
-                            self.insert(y, self.h[y])
+                            self.insert(self.h[y], y)
         print("No min")
         return self.get_kmin()
 
     def modify_cost(self):
         xparent = self.b[self.state_space]
         if self.tag[self.state_space] == 'Closed':
-            self.insert(self.state_space, self.h[xparent] + self.cost(self.state_space, xparent))
+            self.insert(self.h[xparent] + self.cost(self.state_space, xparent), self.state_space)
 
     def modify(self, state_space):
         self.modify_cost(state_space)
