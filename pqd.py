@@ -384,6 +384,6 @@ class D_star(object):
 if __name__ == '__main__':
     try:
         D = D_star(1)
-        D.run()
     finally:
         D.vehicle.destroy()
+    D.run()
