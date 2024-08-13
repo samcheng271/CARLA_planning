@@ -4,7 +4,8 @@ import numpy as np
 import random
 from collections import defaultdict
 # from queue import PriorityQueue
-from PriorityQueue import PriorityQueue, Priority # Make sure you have PriorityQueue.py 
+from queue import PriorityQueue
+#from PriorityQueue import PriorityQueue, Priority # Make sure you have PriorityQueue.py 
 # and that the built in queue module is commented out
 
 #write a separate file
