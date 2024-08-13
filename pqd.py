@@ -63,19 +63,11 @@ class D_star(object):
     def populate_open(self):
         if not self.vehicle:
             return []
-        
-        temp = False
+    
         self.key = self.cost(self.state_space, self.get_nearest_state(self.waypoint))
         tup = (self.state_space, self.key)
-        for wp in range(len(self.OPEN)):
-            if self.key < self.OPEN[wp][0]:
-                self.OPEN.insert(wp, tup)
-                print(f'pushed {tup}')
-                temp = True
-                break
-
-        if not temp: 
-            self.OPEN.append(tup)
+        self.OPEN.put(tup)
+        print(f'pushed {tup}')
             
         return self.OPEN
 
@@ -151,13 +143,13 @@ class D_star(object):
     def get_kmin(self):
         if self.OPEN:
             self.populate_open()
-            minimum = self.OPEN[0] # Pop and return the tuple with the minimum key value
+            minimum = self.OPEN.get() # Pop and return the tuple with the minimum key value
             return minimum[1]
         
     def min_state(self):
         if self.OPEN:
             self.populate_open()
-            minimum = self.OPEN[0]
+            minimum = self.OPEN.get()
             return minimum[0], minimum[1] #returns state k with associated key value
         return None, -1
 
@@ -193,16 +185,8 @@ class D_star(object):
         if tag == 'Closed':
             kx = min(self.h.get(state, float('inf')), h_new)
         
-        temp = False
-        for wp in range(len(self.OPEN)):
-            if kx < self.OPEN[wp][0]:
-                self.OPEN.insert(wp, (kx, state))
-                print(f'pushed {(kx, state)}')
-                temp = True
-                break
-
-        if not temp: 
-            self.OPEN.append((kx, state))
+        self.OPEN.put((kx, state))
+        print(f'values: {(kx, state)}')
 
         self.h[waypoint_id], self.tag[waypoint_id] = h_new, 'Open'
 
@@ -340,16 +324,7 @@ class D_star(object):
 
         #heapq.heappush(self.OPEN, (self.cost(self.x0, self.xt), self.x0))
         #double check
-        temp = False
-        element_one = (self.cost(self.x0, self.xt), self.x0)
-        for wp in range(len(self.OPEN)):
-            if element_one[0] < self.OPEN[wp][0]:
-                self.OPEN.insert(wp, element_one)
-                temp = True
-                break
-
-        if not temp: 
-            self.OPEN.append((self.cost(self.x0, self.xt), self.x0))
+        self.OPEN.put((self.cost(self.x0, self.xt), self.x0))
 
         print(f'self.tag: {self.tag}')
         print(f'self.x0: {self.x0}')
