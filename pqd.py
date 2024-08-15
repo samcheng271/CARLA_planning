@@ -45,10 +45,10 @@ class D_star(object):
         self.state = self.waypoint
         self.location = self.vehicle.get_location()
         self.state_space = self.map.get_waypoint(self.location, project_to_road=True)
-        print(f"print: {self.state_space}")
+        #print(f"print: {self.state_space}")
         #self.state_space = self.map.get_waypoint(self.vehicle.get_location())
         self.waypoints = self.map.generate_waypoints(self.resolution)
-        print(f"waypoint list: {self.waypoints}")
+        # print(f"waypoint list: {self.waypoints}")
 
         wp_tuple = self.init_vehicle()
         if wp_tuple:
@@ -70,10 +70,10 @@ class D_star(object):
             return []
     
         self.key = self.cost(self.state_space, self.get_nearest_state(self.waypoint))
-        print(f'key: {self.key}')
+        #print(f'key: {self.key}')
         tup = (self.key, self.state_space)
         self.OPEN.put(tup)
-        print(f'OPEN tuple insert: {tup}')
+        #print(f'OPEN tuple insert: {tup}')
             
         return self.OPEN
 
@@ -108,7 +108,7 @@ class D_star(object):
         positive_vehicle = self.vehicle.get_transform().get_forward_vector()
         print(f'positive_vehicle: {positive_vehicle}')
         nearest_state = None
-        min_distance = 1000
+        min_distance = float('inf')
 
         #gets the state_space nearest to vehicle
         for state in self.waypoints:
@@ -161,14 +161,14 @@ class D_star(object):
         if self.OPEN:
             self.populate_open()
             minimum = self.OPEN.get() # Pop and return the tuple with the minimum key value
-            print(f'get_kmin: minimum: {minimum[0]}')
+            #print(f'get_kmin: minimum: {minimum[0]}')
             return minimum[0]
         
     def min_state(self):
         if self.OPEN:
             self.populate_open()
             minimum = self.OPEN.get()
-            print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
+            #print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
             return minimum[0], minimum[1] #returns state k with associated key value
         
         return None, -1
@@ -196,18 +196,12 @@ class D_star(object):
         else: 
             tag = 'New'
 
-        if tag == 'New':
-            kx = h_new
-            #analyze Open case
-        if tag == 'Open':
-            kx = min(self.h.get(state, float('inf')), h_new)
-        if tag == 'Closed':
-            kx = min(self.h.get(state, float('inf')), h_new)
-        
-        self.OPEN.put((kx, state))
-        print(f'values: {(kx, state)}')
-
-        self.h[waypoint_id], self.tag[waypoint_id] = h_new, 'Open'
+        if tag == 'New' or h_new < self.h.get(waypoint_id, float('inf')):
+            kx = min(self.h.get(waypoint_id, float('inf')), h_new)
+            self.OPEN.put((kx, state))
+            self.h[waypoint_id] = h_new
+            self.tag[waypoint_id] = 'Open' 
+            print(f'Inserted state {state} with key {kx}')
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
@@ -241,6 +235,15 @@ class D_star(object):
         # print(f'x: {x}, kold: {kold}')
         print(f'h: {self.h}')
         print(f'b: {self.b}')
+        
+        for y in self.children(x):
+            self.checkState(y)  
+            h_new = self.h[x.id] + self.cost(x, y)
+
+        if h_new < self.h.get(y.id, float('inf')):
+            self.b[y] = x
+            self.insert(h_new, y)
+            
         if kold < self.h[x.id]:  # raised states
             print(f'kold < h[x.id]: {kold} < {self.h[x.id]}')
             for y in self.children(x):
@@ -311,11 +314,13 @@ class D_star(object):
                 break
 
     def cost(self, start, goal):
+        """
         print(f'Calculating cost from {start} to {goal}')
         if goal.id in self.Obstaclemap:
             print(f'Goal {goal.id} is in Obstaclemap')
             return np.inf
-    
+        """
+
         distance = start.transform.location.distance(goal.transform.location)
         print(f'Distance: {distance}')
         return distance
