@@ -49,7 +49,7 @@ class D_star(object):
         #self.state_space = self.map.get_waypoint(self.vehicle.get_location())
         self.waypoints = self.map.generate_waypoints(self.resolution)
         # print(f"waypoint list: {self.waypoints}")
-        self.h = {waypoint.id: self.cost(waypoint, self.goal) for wp in self.waypoints}
+        self.h = {}
 
         wp_tuple = self.init_vehicle()
         if wp_tuple:
