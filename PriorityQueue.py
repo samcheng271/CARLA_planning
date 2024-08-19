@@ -27,35 +27,37 @@ class Priority:
         """
         return self.k1 < other.k1 or (self.k1 == other.k1 and self.k2 <= other.k2)
 
-
+"""
 class PriorityNode:
-    """
+    
     handle lexicographic order of vertices
-    """
+    
 
     def __init__(self, priority, vertex):
-        """
+        
         :param priority: the priority of a
         :param vertex:
-        """
+        
         self.priority = priority
         self.vertex = vertex
 
     def __le__(self, other):
-        """
+        
         :param other: comparable node
         :return: lexicographic order
-        """
+        
         return self.priority <= other.priority
 
     def __lt__(self, other):
-        """
+        
         :param other: comparable node
         :return: lexicographic order
-        """
+        
         return self.priority < other.priority
 
+"""
 
+"""
 class PriorityQueue:
     def __init__(self):
         self.heap = []
@@ -71,8 +73,8 @@ class PriorityQueue:
         return self.heap[0].priority
 
     def pop(self):
-        """!!!THIS CODE WAS COPIED AND MODIFIED!!! Source: Lib/heapq.py"""
-        """Pop the smallest item off the heap, maintaining the heap invariant."""
+        
+        #Pop the smallest item off the heap, maintaining the heap invariant.
         lastelt = self.heap.pop()  # raises appropriate IndexError if heap is empty
         # print(f'lastelt {lastelt.vertex}')
         self.vertices_in_heap.remove(lastelt.vertex)
@@ -87,8 +89,8 @@ class PriorityQueue:
     def insert(self, vertex, priority):
         item = PriorityNode(priority, vertex)
         self.vertices_in_heap.append(vertex)
-        """!!!THIS CODE WAS COPIED AND MODIFIED!!! Source: Lib/heapq.py"""
-        """Push item onto heap, maintaining the heap invariant."""
+        
+        #Push item onto heap, maintaining the heap invariant.
         self.heap.append(item)
         self._siftdown(0, len(self.heap) - 1)
 
@@ -110,7 +112,7 @@ class PriorityQueue:
 
     # !!!THIS FUNCTION WAS COPIED AND MODIFIED!!! Source: Lib/heapq.py
     def build_heap(self):
-        """Transform list into a heap, in-place, in O(len(x)) time."""
+        #Transform list into a heap, in-place, in O(len(x)) time.
         n = len(self.heap)
         # Transform bottom-up.  The largest index there's any point to looking at
         # is the largest with a child index in-range, so must have 2*i + 1 < n,
@@ -157,3 +159,5 @@ class PriorityQueue:
         # to its final resting place (by sifting its parents down).
         self.heap[pos] = newitem
         self._siftdown(startpos, pos)
+    
+"""
