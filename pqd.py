@@ -236,7 +236,7 @@ class D_star(object):
         print(f'b: {self.b}')
 
         #here is where it's breaking 
-        print(f'Children of x: {list(self.children(x))}')
+        #print(f'Children of x: {list(self.children(x))}')
         for y in self.children(x):
             self.checkState(y)  
             print(f'Processing child y: {y}')
@@ -347,8 +347,6 @@ class D_star(object):
         if current_waypoint is None:
             return children
 
-        #this for loop doesn't make sense you are running a for loop with a waypoint in the next waypoint
-        #next only gets the next nearest state
         next_waypoint = current_waypoint.next(2.0)
         if next_waypoint:
             next_wp = next_waypoint[0]
@@ -404,7 +402,7 @@ class D_star(object):
         print(f'self.x0: {self.x0}')
 
         #this while loop could potentially be the issue, xt.id is never turning into closed
-        #what does it take to make it closed--for it to be in visited??
+        #what does it need to make it closed--for it to be in visited?
         while self.tag.get(self.xt.id, 'New') != "Closed":
             print(f"Goal state tag: {self.tag.get(self.xt.id, 'New')}") 
             kmin = self.process_state()
