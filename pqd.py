@@ -8,8 +8,7 @@ from queue import PriorityQueue
 #from PriorityQueue import PriorityQueue, Priority # Make sure you have PriorityQueue.py 
 # and that the built in queue module is commented out
 
-#write a separate file
-#consider move-robot
+#consider move-robot-how does move-robot compare to move_vehicle 
 class D_star(object):
     def __init__(self, waypoint, resolution=0.5):
         self.settings = 'CollisionChecking'
@@ -40,14 +39,13 @@ class D_star(object):
         vehicle = self.world.spawn_actor(vehicle_bp, self.start_spawn)
 
         self.vehicle = vehicle
-        # print("Vehicle spawned.", vehicle.get_location())
-        #1. check if should not be used here->vehicle waypoint initalization
         self.state = self.waypoint
         self.location = self.vehicle.get_location()
         self.state_space = self.map.get_waypoint(self.location, project_to_road=True)
         #print(f"print: {self.state_space}")
         #self.state_space = self.map.get_waypoint(self.vehicle.get_location())
         self.waypoints = self.map.generate_waypoints(self.resolution)
+        print(f"Number of waypoints generated: {len(self.waypoints)}")
         # print(f"waypoint list: {self.waypoints}")
         self.h = {}
 
@@ -73,8 +71,9 @@ class D_star(object):
         self.key = self.cost(self.state_space, self.get_nearest_state(self.waypoint))
         #print(f'key: {self.key}')
         tup = (self.key, self.state_space)
+    
         self.OPEN.put(tup)
-        #print(f'OPEN tuple insert: {tup}')
+        print(f'OPEN tuple insert: {tup}')
             
         return self.OPEN
 
@@ -112,6 +111,8 @@ class D_star(object):
         min_distance = float('inf')
 
         #gets the state_space nearest to vehicle
+        #this condition is always met and doesnt end bc a state(which is a wp) is always in waypoints list
+        #i want this for loop to be a state in self.waypoints that we are only considering positive waypoints in front of the vehicle and poss waypoints?
         for state in self.waypoints:
             state_location = carla.Location(x=(state.transform.location.x), y=(state.transform.location.y), z=(state.transform.location.z))
             print(f'statex: {state.transform.location.x}')
@@ -126,6 +127,8 @@ class D_star(object):
                 min_distance = distance
                 nearest_state = state
 
+                if min_distance < self.resolution:
+                    break
 
         if nearest_state:
             nearest_location = carla.Location(x=(nearest_state.transform.location.x), y=(nearest_state.transform.location.y), z=(nearest_state.transform.location.z))
@@ -201,6 +204,7 @@ class D_star(object):
             self.V.add(state)
             return -1
 
+        #check this if loop
         if tag == 'New' or h_new < self.h.get(waypoint_id, float('inf')):
             kx = min(self.h.get(waypoint_id, float('inf')), h_new)
             self.OPEN.put((kx, state))
@@ -210,21 +214,12 @@ class D_star(object):
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
-        """
-        if not self.OPEN:
-            print("Open is empty")
-            return -1
-        """
+        
         #x is a state, kold is key
         #x, kold = self.min_state()
         kold, x = self.min_state()
         print(f'process state: kold: {kold}, statex: {x}')
 
-        """
-        if x is None:
-            print("No valid state")
-            return -1 
-        """
         # print(f'x: {x}, kold: {kold}')
         self.tag[x.id] = 'Closed'
         self.V.add(x)
@@ -271,7 +266,7 @@ class D_star(object):
                 if self.h[y.id] <= kold and self.h[x.id] > a:
                     print(f'b and h for x: {x}')
                     self.b[x.id]
-                    self.h[x.id] = y, a
+                    self.h[x.id] = (y.id, a)
         if kold == self.h[x.id]:  # lower
             print(f'kold == h[x.id]: {kold} == {self.h[x.id]}')
             for y in self.children(x):
@@ -284,7 +279,7 @@ class D_star(object):
                         (self.b[y.id] == x and self.h[y.id] != bb) or \
                         (self.b[y.id] != x and self.h[y.id] > bb):
                     print(f'Insert y: {y} with bb: {bb}')
-                    self.b[y.id] = x
+                    self.b[y.id] = x.id
                     self.insert(bb, y)
         else:
             print(f'kold != h[x.id]: {kold} != {self.h[x.id]}')
@@ -297,14 +292,14 @@ class D_star(object):
                 if self.tag[y.id] == 'New' or \
                         (self.b[y.id] == x and self.h[y.id] != bb):
                     print(f'insert y: {y} with bb: {bb}')
-                    self.b[y.id] = x
+                    self.b[y.id] = x.id
                     self.insert(bb, y)
                 else:
-                    if self.b[y.id] != x and self.h[y.id] > bb:
+                    if self.b[y.id] != x.id and self.h[y.id] > bb:
                         print(f'insert x: {x} with h[x]: {self.h[x.id]}')
                         self.insert(self.h[x.id], x)
                     else:
-                        if self.b[y.id] != x and self.h[y.id] > bb and \
+                        if self.b[y.id] != x.id and self.h[y.id] > bb and \
                                 self.tag[y.id] == 'Closed' and self.h[y.id] == kold:
                             print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
                             self.insert(self.h[y.id], y)
@@ -323,6 +318,7 @@ class D_star(object):
     def modify(self, state_space):
         print(f'modify: state_space: {state_space}')
         self.modify_cost(state_space)
+        #this while loop will run forever 
         while True:
             kmin = self.process_state()
             print(f'process_state returned kmin: {kmin}')
@@ -351,7 +347,10 @@ class D_star(object):
         if current_waypoint is None:
             return children
 
-        for next_wp in current_waypoint.next(2.0):
+        #this for loop doesn't make sense you are running a for loop with a waypoint in the next waypoint
+        #next only gets the next nearest state
+        next_wp = current_waypoint.next(2.0)
+        if next_wp:
             next_state = (next_wp.transform.location.x, next_wp.transform.location.y, next_wp.transform.location.z)
             if next_state in self.waypoints:
                 children.append(next_state)
@@ -403,6 +402,8 @@ class D_star(object):
         print(f'self.tag: {self.tag}')
         print(f'self.x0: {self.x0}')
 
+        #this while loop could potentially be the issue, xt.id is never turning into closed
+        #what does it take to make it closed--for it to be in visited??
         while self.tag.get(self.xt.id, 'New') != "Closed":
             print(f"Goal state tag: {self.tag.get(self.xt.id, 'New')}") 
             kmin = self.process_state()

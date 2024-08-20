@@ -220,6 +220,7 @@ class D_star(object):
         if tag == 'Open':
             kx = min(self.h.get(state, float('inf')), h_new)
         if tag == 'Closed':
+            #infinite loop could be because closed and open have the same 
             kx = min(self.h.get(state, float('inf')), h_new)
         
         heapq.heappush(self.OPEN, (kx, state))
