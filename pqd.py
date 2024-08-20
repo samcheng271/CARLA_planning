@@ -349,8 +349,9 @@ class D_star(object):
 
         #this for loop doesn't make sense you are running a for loop with a waypoint in the next waypoint
         #next only gets the next nearest state
-        next_wp = current_waypoint.next(2.0)
-        if next_wp:
+        next_waypoint = current_waypoint.next(2.0)
+        if next_waypoint:
+            next_wp = next_waypoint[0]
             next_state = (next_wp.transform.location.x, next_wp.transform.location.y, next_wp.transform.location.z)
             if next_state in self.waypoints:
                 children.append(next_state)
