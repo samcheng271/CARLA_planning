@@ -112,13 +112,14 @@ class D_star(object):
                 min_distance = distance
                 nearest_state = state
 
-                if min_distance < self.resolution:
+                if min_distance <= self.resolution:
                     break
 
         if nearest_state:
             nearest_location = carla.Location(x=(nearest_state.transform.location.x), y=(nearest_state.transform.location.y), z=(nearest_state.transform.location.z))
             print(f'nearest_location: {nearest_location}')
             min_dist = float('inf')
+            # print(f'get actors:{self.world.get_actors()}')
             for actor in self.world.get_actors():
                 if isinstance(actor, carla.Vehicle) and actor.id != self.vehicle.id:
                     obs_location = actor.get_location()
