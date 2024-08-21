@@ -10,7 +10,7 @@ from queue import PriorityQueue
 
 #consider move-robot-how does move-robot compare to move_vehicle 
 class D_star(object):
-    def __init__(self, waypoint, resolution=0.5):
+    def __init__(self, waypoint, resolution=2.0):
         self.settings = 'CollisionChecking'
         self.resolution = resolution
         self.waypoint = waypoint
@@ -62,20 +62,6 @@ class D_star(object):
         print(f'x0: {self.x0}')
         self.xt = self.map.get_waypoint(self.goal_location.transform.location)
         print(f'xt: {self.xt}')
-        
-
-    def populate_open(self):
-        if not self.vehicle:
-            return []
-    
-        self.key = self.cost(self.state_space, self.get_nearest_state(self.waypoint))
-        #print(f'key: {self.key}')
-        tup = (self.key, self.state_space)
-    
-        self.OPEN.put(tup)
-        print(f'OPEN tuple insert: {tup}')
-            
-        return self.OPEN
 
     def init_vehicle(self):
         try:
@@ -110,19 +96,18 @@ class D_star(object):
         nearest_state = None
         min_distance = float('inf')
 
-        #gets the state_space nearest to vehicle
-        #this condition is always met and doesnt end bc a state(which is a wp) is always in waypoints list
-        #i want this for loop to be a state in self.waypoints that we are only considering positive waypoints in front of the vehicle and poss waypoints?
+        
         for state in self.waypoints:
             state_location = carla.Location(x=(state.transform.location.x), y=(state.transform.location.y), z=(state.transform.location.z))
+            """
             print(f'statex: {state.transform.location.x}')
             print(f'statey: {state.transform.location.y}')
             print(f'statez: {state.transform.location.z}')
-
-            distance = vehicle_location.distance(state_location)
-
+            """
             direction_vector = state_location - vehicle_location
-
+            distance = direction_vector.length()
+            
+            #issue: min distance is sometimes less than distance which is causing the condition to fail 
             if positive_vehicle.dot(direction_vector) > 0 and distance < min_distance and distance > 5:
                 min_distance = distance
                 nearest_state = state
@@ -145,6 +130,21 @@ class D_star(object):
                 return None
 
         return nearest_state
+    
+    def populate_open(self):
+        if not self.vehicle:
+            return []
+        next_wp = self.waypoints.next()
+        next_wp_loc = carla.Location(x=next_wp.transform.location.x, y=next_wp.transform.location.y, z=next_wp.transform.location.z)
+        #self.key = self.cost(self.state_space, self.get_nearest_state(self.waypoint))
+        self.key = self.cost(self.state_space, next_wp_loc)
+        #print(f'key: {self.key}')
+        tup = (self.key, self.state_space)
+    
+        self.OPEN.put(tup)
+        print(f'OPEN tuple insert: {tup}')
+            
+        return self.OPEN
 
     # Checks if a 'y' state has both heuristic and tag dicts
     def checkState(self, y):
@@ -214,16 +214,15 @@ class D_star(object):
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
-        
         #x is a state, kold is key
-        #x, kold = self.min_state()
         kold, x = self.min_state()
         print(f'process state: kold: {kold}, statex: {x}')
 
-        # print(f'x: {x}, kold: {kold}')
-        self.tag[x.id] = 'Closed'
-        self.V.add(x)
-        print(f'print V: {self.V}')
+        if x is None: 
+            return -1
+        
+        if self.h[x.id] == float('inf'):
+            return -1 
         
         if x.id == self.xt.id:
             print("goal reached")
@@ -234,76 +233,74 @@ class D_star(object):
         # print(f'x: {x}, kold: {kold}')
         print(f'h: {self.h}')
         print(f'b: {self.b}')
-
-        #here is where it's breaking 
-        #print(f'Children of x: {list(self.children(x))}')
-        for y in self.children(x):
-            self.checkState(y)  
-            print(f'Processing child y: {y}')
-            print(f'x.id: {x.id}, self.h[x.id]: {self.h[x.id]}')
-            print(f'Cost(x, y): {self.cost(x, y)}')
-            if y.id not in self.h:
-                self.h[y.id] = float('inf')
-            if y.id not in self.tag:
-                self.tag[y.id] = 'New'
+        if x.id not in self.V:
+            for y in self.children(x):
+                self.checkState(y)  
+                print(f'Processing child y: {y}')
+                print(f'x.id: {x.id}, self.h[x.id]: {self.h[x.id]}')
+                print(f'Cost(x, y): {self.cost(x, y)}')
+                if y.id not in self.h:
+                    self.h[y.id] = float('inf')
+                if y.id not in self.tag:
+                    self.tag[y.id] = 'New'
             
-            old_h = self.h[y.id]
-            h_new = self.h[x.id] + self.cost(x, y)
-            print(f'h_new: {h_new}')
-            if h_new < self.h[y.id]:
-                self.h[y.id] = h_new
-                self.b[y.id] = x.id
-                self.insert(h_new, y)
+                h_new = self.h[x.id] + self.cost(x, y)
+                print(f'h_new: {h_new}')
+                if h_new < self.h[y.id]:
+                    self.h[y.id] = h_new
+                    self.b[y.id] = x.id
+                    self.insert(h_new, y)
 
-        if kold < self.h[x.id]:  # raised states
-            print(f'kold < h[x.id]: {kold} < {self.h[x.id]}')
-            for y in self.children(x):
-                print(f'child: {y}')
-                # check y
-                self.checkState(y)
-                a = self.h[y.id] + self.cost(y, x)
-                print(f'print a: {a}')
-                if self.h[y.id] <= kold and self.h[x.id] > a:
-                    print(f'b and h for x: {x}')
-                    self.b[x.id]
-                    self.h[x.id] = (y.id, a)
-        if kold == self.h[x.id]:  # lower
-            print(f'kold == h[x.id]: {kold} == {self.h[x.id]}')
-            for y in self.children(x):
-                # check y
-                print(f'child: {y}')
-                self.checkState(y)
-                bb = self.h[x.id] + self.cost(x, y)
-                print(f'print bb: {bb}')
-                if self.tag[y.id] == 'New' or \
-                        (self.b[y.id] == x and self.h[y.id] != bb) or \
-                        (self.b[y.id] != x and self.h[y.id] > bb):
-                    print(f'Insert y: {y} with bb: {bb}')
-                    self.b[y.id] = x.id
-                    self.insert(bb, y)
-        else:
-            print(f'kold != h[x.id]: {kold} != {self.h[x.id]}')
-            for y in self.children(x):
-                 # check y
-                print(f'child: {y}')
-                self.checkState(y)
-                bb = self.h[x.id] + self.cost(x, y)
-                print(f'bb: {bb}')
-                if self.tag[y.id] == 'New' or \
-                        (self.b[y.id] == x and self.h[y.id] != bb):
-                    print(f'insert y: {y} with bb: {bb}')
-                    self.b[y.id] = x.id
-                    self.insert(bb, y)
-                else:
-                    if self.b[y.id] != x.id and self.h[y.id] > bb:
+            if kold < self.h[x.id]:  # raised states
+                print(f'kold < h[x.id]: {kold} < {self.h[x.id]}')
+                for y in self.children(x):
+                    print(f'child: {y}')
+                    self.checkState(y)
+                    a = self.h[y.id] + self.cost(y, x)
+                    print(f'print a: {a}')
+                    if self.h[y.id] <= kold and self.h[x.id] > self.h[y.id] + self.cost(y, x):
+                        self.b[x.id] = y.id
+                        self.h[x.id] = self.h[y.id] + self.cost(y, x)
+
+            if kold == self.h[x.id]:  # lower states 
+                print(f'kold == h[x.id]: {kold} == {self.h[x.id]}')
+                self.tag[x.id] = 'Closed'
+                self.V.add(x)
+                for y in self.children(x):
+                    # check y
+                    print(f'child: {y}')
+                    self.checkState(y)
+                    bb = self.h[x.id] + self.cost(x, y)
+                    print(f'print bb: {bb}')
+                    if self.tag[y.id] == 'New' or \
+                            (self.b[y.id] == x.id and self.h[y.id] != bb) or \
+                            (self.b[y.id] != x.id and self.h[y.id] > bb):
+                        print(f'Insert y: {y} with bb: {bb}')
+                        self.b[y.id] = x.id
+                        self.insert(bb, y)
+            else:
+                print(f'kold != h[x.id]: {kold} != {self.h[x.id]}')
+                for y in self.children(x):
+                    # check y
+                    print(f'child: {y}')
+                    self.checkState(y)
+                    bb = self.h[x.id] + self.cost(x, y)
+                    print(f'bb: {bb}')
+                    if self.tag[y.id] == 'New' or \
+                            (self.b[y.id] == x and self.h[y.id] != bb):
+                        print(f'insert y: {y} with bb: {bb}')
+                        self.b[y.id] = x.id
+                        self.insert(bb, y)
+                    elif self.b[y.id] != x.id and self.h[y.id] > bb:
                         print(f'insert x: {x} with h[x]: {self.h[x.id]}')
                         self.insert(self.h[x.id], x)
-                    else:
-                        if self.b[y.id] != x.id and self.h[y.id] > bb and \
-                                self.tag[y.id] == 'Closed' and self.h[y.id] == kold:
-                            print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
-                            self.insert(self.h[y.id], y)
-        print("No min")
+                    elif self.b[y.id] != x.id and self.h[y.id] > bb and \
+                        self.tag[y.id] == 'Closed' and self.h[y.id] == kold:
+                        print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
+                        self.insert(self.h[y.id], y)
+            print("No min")
+        else: 
+            return -1
         return self.get_kmin()
 
     def modify_cost(self):
@@ -317,14 +314,15 @@ class D_star(object):
 
     def modify(self, state_space):
         print(f'modify: state_space: {state_space}')
-        self.modify_cost(state_space)
+        self.modify_cost()
         #this while loop will run forever 
-        while True:
+        kmin = self.get_kmin()
+        while kmin is not None and kmin < self.h[state_space]:
             kmin = self.process_state()
             print(f'process_state returned kmin: {kmin}')
-            if kmin >= self.h[state_space]:
-                print(f'kmin {kmin} >= h[state_space] {self.h[state_space]}')
-                break
+        if kmin is None or kmin >= self.h[state_space]:
+            print(f'kmin {kmin} >= h[state_space] {self.h[state_space]}')
+            return -1 
 
     def cost(self, start, goal):
         """
@@ -374,14 +372,17 @@ class D_star(object):
         print(f'path: goal: {goal}')
         path = []
         location = []
+        start = self.xt
         if not goal:
             x = self.x0
             print(f'No goal provided, using x0: {x}')
         else:
             x = goal
-            start = self.xt
             print(f'Goal provided: {goal}, start: {start}')
+
         while x != start:
+            if x not in self.b: 
+                break
             print(f'Appending to path: x: {x}, b[x]: {self.b[x]}')
             path.append([np.array(x), np.array(self.b[x])])
             location.append(carla.Location(x=x[0], y=x[1], z=x[2]))
@@ -411,6 +412,10 @@ class D_star(object):
                 print("No path found.")
                 return
 
+            #for state in self.V: 
+            #state is added to V here but nothing else happens
+            #need to iterate through V set as the algs runs until so the 
+            #condition all of the paths explored are added to this V and eventually x0 == xt
         self.Path = self.path()
         print(f'Path found: {self.Path}')
         self.done = True
