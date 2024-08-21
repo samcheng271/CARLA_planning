@@ -55,6 +55,7 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
         # Early exit if we have reached near the goal
         if current_node.waypoint.transform.location.distance(end_waypoint.transform.location) < 10.0:
             path = []
+
             while current_node:
                 path.append(current_node.waypoint)
                 current_node = came_from.get(current_node.waypoint.id)
@@ -66,6 +67,7 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
         #     return None
         
         for next_waypoint in get_legal_neighbors(current_node.waypoint):
+            # world.debug.draw_string(next_waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=220), life_time=60.0, persistent_lines=True)
             # Add a small cost for lane changes
             lane_change_cost = 5 if next_waypoint.lane_id != current_node.waypoint.lane_id else 0
 
@@ -82,6 +84,7 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
                 world.debug.draw_string(next_waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=0, g=220, b=0), life_time=60.0, persistent_lines=True)
                 
                 came_from[next_waypoint.id] = current_node
+                
                 g_score[next_waypoint.id] = tentative_g_score
                 f_score[next_waypoint.id] = tentative_g_score + heuristic_func(next_waypoint, end_waypoint)
                 new_node = AStarNode(next_waypoint, tentative_g_score, heuristic_func(next_waypoint, end_waypoint), current_node)
@@ -92,98 +95,100 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
     return None
 
 def main():
-    # Connect to the CARLA server
-    client = carla.Client('localhost', 2000)
-    client.set_timeout(10.0)
+    try:
+        # Connect to the CARLA server
+        client = carla.Client('localhost', 2000)
+        client.set_timeout(10.0)
 
-    # Get the world and map
-    world = client.get_world()
-    carla_map = world.get_map()
+        # Get the world and map
+        world = client.get_world()
+        carla_map = world.get_map()
 
-    # Spawn a firetruck at a random location (point A)
-    blueprint_library = world.get_blueprint_library()
-    firetruck_bp = blueprint_library.filter('vehicle.carlamotors.firetruck')[0]
-    spawn_points = carla_map.get_spawn_points()
+        # Spawn a firetruck at a random location (point A)
+        blueprint_library = world.get_blueprint_library()
+        firetruck_bp = blueprint_library.filter('vehicle.carlamotors.firetruck')[0]
+        spawn_points = carla_map.get_spawn_points()
 
 
-    # Choose a random starting location (point A)
-    point_a = random.choice(spawn_points)
-    firetruck = world.spawn_actor(firetruck_bp, point_a)
+        # Choose a random starting location (point A)
+        point_a = random.choice(spawn_points)
+        firetruck = world.spawn_actor(firetruck_bp, point_a)
 
-    # Choose a random destination (point B)
-    point_b = random.choice(spawn_points)
-    while point_b.location == point_a.location:
+        # Choose a random destination (point B)
         point_b = random.choice(spawn_points)
+        while point_b.location == point_a.location:
+            point_b = random.choice(spawn_points)
 
-    start_waypoint = carla_map.get_waypoint(point_a.location)
-    end_waypoint = carla_map.get_waypoint(point_b.location)
+        start_waypoint = carla_map.get_waypoint(point_a.location)
+        end_waypoint = carla_map.get_waypoint(point_b.location)
 
-    print("Firetruck starting at", point_a.location)
-    print(f"Destination: {point_b.location}")
-
-
-    # Manual waypoint selection
-    # Uncomment below to manually test with 2 points
-
-    # # These two points are used to test lane changes
-    # point_a = carla.Location(x=-52.133560, y=-40.180298, z=0.600000)
-    # point_b = carla.Location(x=-111.120361, y=72.898865, z=0.600000)
-
-    # # Another 2 points to test if vehicle should stop nearby destination
-    # point_a = carla.Location(x=-64.581863, y=-65.167366, z=0.600000)
-    # point_b = carla.Location(x=-27.022133, y=69.714005, z=0.600000)
-
-    # # Another 2 points to test if vehicle should stop nearby destination
-    # point_a = carla.Location(x=109.946968, y=-17.187952, z=0.599999)
-    # point_b = carla.Location(x=26.382587, y=-57.401386, z=0.600000)
-
-    # Get the waypoint closest to point_a and point_b
-    waypoint_a = carla_map.get_waypoint(point_a, project_to_road=True)
-    waypoint_b = carla_map.get_waypoint(point_b, project_to_road=True)
-
-    start_waypoint = waypoint_a
-    end_waypoint = waypoint_b
-    print(f"Point A wp: {start_waypoint}")
-    print(f"Point B wp: {end_waypoint}")
-    
+        print("Firetruck starting at", point_a.location)
+        print(f"Destination: {point_b.location}")
 
 
-    # Run A*
-    route = a_star(world, start_waypoint, end_waypoint)
+        # Manual waypoint selection
+        # Uncomment below to manually test with 2 points
 
-    if route is None:
-        # To prevent infinite loop
-        print("Failed to find a path. Try adjusting the max_distance in the a_star function.")
-        firetruck.destroy()
-        return
+        # # These two points are used to test lane changes
+        # point_a = carla.Location(x=-52.133560, y=-40.180298, z=0.600000)
+        # point_b = carla.Location(x=-111.120361, y=72.898865, z=0.600000)
 
-    print(f"Route found with {len(route)} waypoints")
+        # # Another 2 points to test if vehicle should stop nearby destination
+        point_a = carla.Location(x=-64.581863, y=-65.167366, z=0.600000)
+        point_b = carla.Location(x=-27.022133, y=69.714005, z=0.600000)
 
-    # Keeping for debugging purposes
-    # start_time = time.time()
-    # timeout = 300  # 5 minutes timeout
+        # Another 2 points to test if vehicle should stop nearby destination
+        # point_a = carla.Location(x=109.946968, y=-17.187952, z=0.599999)
+        # point_b = carla.Location(x=26.382587, y=-57.401386, z=0.600000)
 
-    # Draws the route the vehicle will follow (red)
-    for waypoint in route:
-        world.debug.draw_string(waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
+        # Get the waypoint closest to point_a and point_b
+        waypoint_a = carla_map.get_waypoint(point_a, project_to_road=True)
+        waypoint_b = carla_map.get_waypoint(point_b, project_to_road=True)
 
-    # Follow the route
-    for i, waypoint in enumerate(route):
+        start_waypoint = waypoint_a
+        end_waypoint = waypoint_b
+        # End of manual waypoint selection
+        print(f"Point A wp: {start_waypoint}")
+        print(f"Point B wp: {end_waypoint}")
+        
+
+
+        # Run A*
+        route = a_star(world, start_waypoint, end_waypoint)
+
+        if route is None:
+            # To prevent infinite loop
+            print("Failed to find a path. Try adjusting the max_distance in the a_star function.")
+            firetruck.destroy()
+            return
+
+        print(f"Route found with {len(route)} waypoints")
+
         # Keeping for debugging purposes
-        # if time.time() - start_time > timeout:
-        #     print(f"Timeout reached after {timeout} seconds")
-        #     break
+        # start_time = time.time()
+        # timeout = 300  # 5 minutes timeout
+        route = carla_map.generate_waypoints(2.0)
+        # Draws the route the vehicle will follow (red)
+        for waypoint in route:
+            world.debug.draw_string(waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
 
-        firetruck.set_transform(waypoint.transform)
-        if i % 10 == 0:  # Print progress every 10 waypoints
-            print(f"Waypoint {i}/{len(route)}")
-        time.sleep(0.05)  # Reduced delay for faster execution
+        # Follow the route
+        for i, waypoint in enumerate(route):
+            # Keeping for debugging purposes
+            # if time.time() - start_time > timeout:
+            #     print(f"Timeout reached after {timeout} seconds")
+            #     break
 
-    print("Firetruck has reached its destination or the route has ended!")
+            firetruck.set_transform(waypoint.transform)
+            if i % 10 == 0:  # Print progress every 10 waypoints
+                print(f"Waypoint {i}/{len(route)}")
+            time.sleep(0.05)  # Reduced delay for faster execution
 
+        print("Firetruck has reached its destination or the route has ended!")
 
-    # Clean up
-    firetruck.destroy()
+    finally:
+        # Clean up
+        firetruck.destroy()
 
 if __name__ == '__main__':
     try:
