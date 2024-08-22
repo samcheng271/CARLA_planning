@@ -138,9 +138,9 @@ class D_star(object):
         next_waypoint = self.state_space.next(self.resolution)
         if next_waypoint: 
             next_wp = next_waypoint[0]
-            next_wp_loc = carla.Location(x=next_wp.transform.location.x, y=next_wp.transform.location.y, z=next_wp.transform.location.z)
+            #next_wp_loc = carla.Location(x=next_wp.transform.location.x, y=next_wp.transform.location.y, z=next_wp.transform.location.z)
             #self.key = self.cost(self.state_space, self.get_nearest_state(self.waypoint))
-            self.key = self.cost(self.state_space, next_wp_loc)
+            self.key = self.cost(self.state_space, next_wp)
             #print(f'key: {self.key}')
             tup = (self.key, self.state_space)
     
@@ -474,4 +474,4 @@ if __name__ == '__main__':
         D.run()
 
     finally:
-        D.vehicle.destroy()
+        D.vehicle.destroy() 
