@@ -136,7 +136,7 @@ class D_star(object):
         if not self.vehicle:
             return []
         next_waypoint = self.state_space.next(self.resolution)
-        if next_wp: 
+        if next_waypoint: 
             next_wp = next_waypoint[0]
             next_wp_loc = carla.Location(x=next_wp.transform.location.x, y=next_wp.transform.location.y, z=next_wp.transform.location.z)
             #self.key = self.cost(self.state_space, self.get_nearest_state(self.waypoint))
