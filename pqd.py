@@ -135,7 +135,7 @@ class D_star(object):
     def populate_open(self):
         if not self.vehicle:
             return []
-        next_waypoint = self.waypoints.next(2.0)
+        next_waypoint = self.state_space.next(self.resolution)
         if next_wp: 
             next_wp = next_waypoint[0]
             next_wp_loc = carla.Location(x=next_wp.transform.location.x, y=next_wp.transform.location.y, z=next_wp.transform.location.z)
