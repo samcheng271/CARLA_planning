@@ -87,7 +87,7 @@ class D_star(object):
         start_end = (start_waypoint, end_waypoint)
         return start_end
 
-
+    """
     def get_nearest_state(self, state):
 
         vehicle_location = self.vehicle.get_location()
@@ -131,7 +131,8 @@ class D_star(object):
                 return None
 
         return nearest_state
-    
+    """
+
     def populate_open(self):
         if not self.vehicle:
             return []
@@ -224,6 +225,9 @@ class D_star(object):
         if x is None: 
             return -1
         
+        if x.id not in self.h:
+            self.h[x.id] = float('inf')
+            
         if self.h[x.id] == float('inf'):
             return -1 
         
