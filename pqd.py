@@ -169,14 +169,14 @@ class D_star(object):
         if self.OPEN:
             self.populate_open()
             minimum = self.OPEN.get() # Pop and return the tuple with the minimum key value
-            #print(f'get_kmin: minimum: {minimum[0]}')
+            print(f'get_kmin: minimum: {minimum[0]}')
             return minimum[0]
         
     def min_state(self):
         if self.OPEN:
             self.populate_open()
             minimum = self.OPEN.get()
-            #print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
+            print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
             return minimum[0], minimum[1] #returns state k with associated key value
         
         return None, -1
@@ -229,7 +229,8 @@ class D_star(object):
             self.h[x.id] = float('inf')
 
         if self.h[x.id] == float('inf'):
-            return -1 
+            default = x.transform.location.distance(self.xt.transform.location)
+            self.h[x.id] = default
         
         if x.id == self.xt.id:
             print("goal reached")
@@ -413,7 +414,7 @@ class D_star(object):
         #what does it need to make it closed--for it to be in visited?
         while self.tag.get(self.xt.id, 'New') != "Closed":
             print(f"Goal state tag: {self.tag.get(self.xt.id, 'New')}") 
-            kmin = self.process_state()
+            kmin = self.process_state() #->kmin here is returning -1
             print(f'kmin: {kmin}')
             if kmin == -1:
                 print("No path found.")
