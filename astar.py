@@ -81,7 +81,7 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
             # Comparing g_score for the reason above tentative_g_score.
             if next_waypoint.id not in g_score or tentative_g_score < g_score[next_waypoint.id]:
                 # Draws the possible routes A* checked
-                world.debug.draw_string(next_waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=0, g=220, b=0), life_time=60.0, persistent_lines=True)
+                world.debug.draw_string(next_waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=0, g=220, b=0), life_time=25.0, persistent_lines=True)
                 
                 came_from[next_waypoint.id] = current_node
                 
@@ -99,7 +99,7 @@ def main():
         # Connect to the CARLA server
         client = carla.Client('localhost', 2000)
         client.set_timeout(10.0)
-
+        # world = client.load_world('Town05') # Use this to switch towns
         # Get the world and map
         world = client.get_world()
         carla_map = world.get_map()
@@ -134,19 +134,19 @@ def main():
         # point_b = carla.Location(x=-111.120361, y=72.898865, z=0.600000)
 
         # # Another 2 points to test if vehicle should stop nearby destination
-        point_a = carla.Location(x=-64.581863, y=-65.167366, z=0.600000)
-        point_b = carla.Location(x=-27.022133, y=69.714005, z=0.600000)
+        # point_a = carla.Location(x=-64.581863, y=-65.167366, z=0.600000)
+        # point_b = carla.Location(x=-27.022133, y=69.714005, z=0.600000)
 
-        # Another 2 points to test if vehicle should stop nearby destination
-        # point_a = carla.Location(x=109.946968, y=-17.187952, z=0.599999)
-        # point_b = carla.Location(x=26.382587, y=-57.401386, z=0.600000)
+        # # Another 2 points to test if vehicle should stop nearby destination
+        # # point_a = carla.Location(x=109.946968, y=-17.187952, z=0.599999)
+        # # point_b = carla.Location(x=26.382587, y=-57.401386, z=0.600000)
 
-        # Get the waypoint closest to point_a and point_b
-        waypoint_a = carla_map.get_waypoint(point_a, project_to_road=True)
-        waypoint_b = carla_map.get_waypoint(point_b, project_to_road=True)
+        # # Get the waypoint closest to point_a and point_b
+        # waypoint_a = carla_map.get_waypoint(point_a, project_to_road=True)
+        # waypoint_b = carla_map.get_waypoint(point_b, project_to_road=True)
 
-        start_waypoint = waypoint_a
-        end_waypoint = waypoint_b
+        # start_waypoint = waypoint_a
+        # end_waypoint = waypoint_b
         # End of manual waypoint selection
         print(f"Point A wp: {start_waypoint}")
         print(f"Point B wp: {end_waypoint}")
@@ -167,10 +167,10 @@ def main():
         # Keeping for debugging purposes
         # start_time = time.time()
         # timeout = 300  # 5 minutes timeout
-        route = carla_map.generate_waypoints(2.0)
+        # route = carla_map.generate_waypoints(2.0)
         # Draws the route the vehicle will follow (red)
         for waypoint in route:
-            world.debug.draw_string(waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
+            world.debug.draw_string(waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=25.0, persistent_lines=True)
 
         # Follow the route
         for i, waypoint in enumerate(route):
