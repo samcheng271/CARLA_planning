@@ -10,7 +10,7 @@ from queue import PriorityQueue
 
 #consider move-robot-how does move-robot compare to move_vehicle 
 class D_star(object):
-    def __init__(self, waypoint, resolution=2.0):
+    def __init__(self, waypoint, start_location, goal_location, vehicle, world, map, resolution=2.0):
         self.settings = 'CollisionChecking'
         self.resolution = resolution
         self.waypoint = waypoint
@@ -27,16 +27,16 @@ class D_star(object):
         self.Obstaclemap = {}
         #heapq.heapify(self.OPEN)
 
-        self.client = carla.Client('localhost', 2000)
-        self.client.set_timeout(10.0)
-        self.world = self.client.get_world()
-        self.map = self.world.get_map()
+        # self.client = carla.Client('localhost', 2000)
+        # self.client.set_timeout(10.0)
+        self.world = world
+        self.map = map
 
-        #this is already initalizing vehicle to a starting locaiton
-        vehicle_bp = self.world.get_blueprint_library().filter('vehicle.carlamotors.firetruck')[0]
-        self.spawn_points = self.world.get_map().get_spawn_points()
-        self.start_spawn = self.spawn_points[0]
-        vehicle = self.world.spawn_actor(vehicle_bp, self.start_spawn)
+        # #this is already initalizing vehicle to a starting locaiton
+        # vehicle_bp = self.world.get_blueprint_library().filter('vehicle.carlamotors.firetruck')[0]
+        # self.spawn_points = self.world.get_map().get_spawn_points()
+        # self.start_spawn = self.spawn_points[0]
+        # vehicle = self.world.spawn_actor(vehicle_bp, self.start_spawn)
 
         self.vehicle = vehicle
         self.state = self.waypoint
@@ -49,10 +49,10 @@ class D_star(object):
         # print(f"waypoint list: {self.waypoints}")
         self.h = {}
 
-        wp_tuple = self.init_vehicle()
-        if wp_tuple:
-            start_location, goal_location = wp_tuple
-        print(f'start_location = {start_location}, goal_location = {goal_location}')
+        # wp_tuple = self.init_vehicle()
+        # if wp_tuple:
+        #     start_location, goal_location = wp_tuple
+        # print(f'start_location = {start_location}, goal_location = {goal_location}')
         self.start_location = start_location
         self.goal_location = goal_location
         #self.start_location = self.init_vehicle.parameters[0]
@@ -63,29 +63,29 @@ class D_star(object):
         self.xt = self.map.get_waypoint(self.goal_location.transform.location)
         print(f'xt: {self.xt}')
 
-    def init_vehicle(self):
-        try:
-            if self.vehicle:
-                #self.vehicle is initalized 
-                print("Vehicle spawned.")
-            else:
-                print("Failed to spawn.")
-                self.vehicle = None
-                return None
-        except Exception as e:
-            print(f"Failed to connect to Carla: {e}")
-            self.vehicle = None
-            return None
+    # def init_vehicle(self):
+    #     try:
+    #         if self.vehicle:
+    #             #self.vehicle is initalized 
+    #             print("Vehicle spawned.")
+    #         else:
+    #             print("Failed to spawn.")
+    #             self.vehicle = None
+    #             return None
+    #     except Exception as e:
+    #         print(f"Failed to connect to Carla: {e}")
+    #         self.vehicle = None
+    #         return None
 
-        goal_vehicle = random.choice(self.spawn_points)
-        while goal_vehicle.location == self.start_spawn.location:
-            goal_vehicle = random.choice(self.spawn_points)
+    #     goal_vehicle = random.choice(self.spawn_points)
+    #     while goal_vehicle.location == self.start_spawn.location:
+    #         goal_vehicle = random.choice(self.spawn_points)
 
-        start_waypoint = self.map.get_waypoint(self.start_spawn.location, project_to_road=True)
-        end_waypoint = self.map.get_waypoint(goal_vehicle.location, project_to_road=True)
+    #     start_waypoint = self.map.get_waypoint(self.start_spawn.location, project_to_road=True)
+    #     end_waypoint = self.map.get_waypoint(goal_vehicle.location, project_to_road=True)
 
-        start_end = (start_waypoint, end_waypoint)
-        return start_end
+    #     start_end = (start_waypoint, end_waypoint)
+    #     return start_end
 
     """
     def get_nearest_state(self, state):
@@ -134,8 +134,8 @@ class D_star(object):
     """
 
     def populate_open(self):
-        if not self.vehicle:
-            return []
+        # if not self.vehicle:
+        #     return []
         next_waypoint = self.state_space.next(self.resolution)
         if next_waypoint: 
             next_wp = next_waypoint[0]
@@ -468,13 +468,38 @@ class D_star(object):
             debug.draw_line(
                 carla.Location(x=start[0], y=start[1], z=start[2]),
                 carla.Location(x=end[0], y=end[1], z=end[2]),
-                thickness=0.1, color=carla.Color(r=255, g=0, b=0), life_time=5.0
+                thickness=0.1, color=carla.Color(r=255, g=0, b=0), life_time=15.0
             )
 
 if __name__ == '__main__':
+    client = carla.Client('localhost', 2000)
+    client.set_timeout(10.0)
+    # world = client.load_world('Town05') # Use this to switch towns
+    # Get the world and map
+    world = client.get_world()
+    carla_map = world.get_map()
+
+    # Spawn a firetruck at a random location (point A)
+    blueprint_library = world.get_blueprint_library()
+    firetruck_bp = blueprint_library.filter('vehicle.carlamotors.firetruck')[0]
+    spawn_points = carla_map.get_spawn_points()
+
+
+    # Choose a random starting location (point A)
+    point_a = spawn_points[0]
+    firetruck = world.spawn_actor(firetruck_bp, point_a)
+    # Choose a random destination (point B)
+    point_b = random.choice(spawn_points)
+    while point_b.location == point_a.location:
+        point_b = random.choice(spawn_points)
+
+    start_waypoint = carla_map.get_waypoint(point_a.location)
+    end_waypoint = carla_map.get_waypoint(point_b.location)
+
     try:
-        D = D_star(1)
+        D = D_star(1, start_waypoint, end_waypoint, firetruck, world, carla_map)
         D.run()
 
     finally:
-        D.vehicle.destroy() 
+        firetruck.destroy() 
+        print("Firetruck destroyed")
