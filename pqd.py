@@ -87,7 +87,7 @@ class D_star(object):
         start_end = (start_waypoint, end_waypoint)
         return start_end
 
-    
+    """
     def get_nearest_state(self, state):
 
         vehicle_location = self.vehicle.get_location()
@@ -99,11 +99,11 @@ class D_star(object):
         
         for state in self.waypoints:
             state_location = carla.Location(x=(state.transform.location.x), y=(state.transform.location.y), z=(state.transform.location.z))
-            """
-            print(f'statex: {state.transform.location.x}')
-            print(f'statey: {state.transform.location.y}')
-            print(f'statez: {state.transform.location.z}')
-            """
+            
+            #print(f'statex: {state.transform.location.x}')
+            #print(f'statey: {state.transform.location.y}')
+            #print(f'statez: {state.transform.location.z}')
+        
             direction_vector = state_location - vehicle_location
             distance = direction_vector.length()
             
@@ -131,7 +131,7 @@ class D_star(object):
                 return None
 
         return nearest_state
-    
+    """
 
     def populate_open(self):
         if not self.vehicle:
@@ -195,26 +195,35 @@ class D_star(object):
         #else:
             #waypoint_id = state
 
+        if waypoint_id not in self.tag:
+            self.tag[waypoint_id] = 'New'
+
+        if self.tag[waypoint_id] == 'New': 
+            self.g[waypoint_id] = float('inf')
+        #here how are you checkign if the dictionary itself is "closed"
+
         if h_new is None:
             state_location = self.world.get_map().get_wpid(waypoint_id).transform.location
             h_new = self.cost(self.state_space, state_location)
-            
-        if waypoint_id in self.tag:
-            tag = self.tag[waypoint_id]
-        else: 
-            tag = 'New'
-
-        if tag == 'Closed':
-            self.V.add(state)
-            return -1
 
         #check this if loop
-        if tag == 'New' or h_new < self.h.get(waypoint_id, float('inf')):
-            kx = min(self.h.get(waypoint_id, float('inf')), h_new)
-            self.OPEN.put((kx, state))
+        if h_new < self.h.get(waypoint_id, float('inf')):
             self.h[waypoint_id] = h_new
+            if self.tag[waypoint_id] == 'Closed':
+                kx = min(self.h.get(waypoint_id, float('inf')), h_new)
+                self.OPEN.put((kx, state))
+                self.tag[waypoint_id] = 'Open'
+        elif self.tag[waypoint_id] == 'Closed':
+            self.h[waypoint_id] = h_new
+        else:
+            kx = min(self.h.get(waypoint_id, float('inf')), h_new)
+            self.h[waypoint_id] = h_new
+            self.OPEN.put((kx, state))
             self.tag[waypoint_id] = 'Open' 
             print(f'Inserted state {state} with key {kx}')
+        
+        if self.tag[waypoint_id] == 'Closed':
+            self.V.add(state)
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
@@ -307,8 +316,6 @@ class D_star(object):
                         print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
                         self.insert(self.h[y.id], y)
             print("No min")
-        else: 
-            return -1
         return self.get_kmin()
 
     def modify_cost(self):
