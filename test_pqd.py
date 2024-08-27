@@ -16,7 +16,7 @@ class TestInit(unittest.TestCase):
         self.map.get_waypoint.return_value = MagicMock()
         self.map.generate_waypoints.return_value = [MagicMock()] * 10
 
-    def dstar_init(self):
+    def test_dstar_init(self):
         d_star = D_star(
             waypoint=self.waypoint,
             start_location=self.start_location,
