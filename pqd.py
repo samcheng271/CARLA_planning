@@ -15,7 +15,7 @@ class D_star(object):
         self.resolution = resolution
         self.waypoint = waypoint
         self.obstacle_threshold = 3.0
-        self.b = defaultdict(lambda: defaultdict(dict))
+        self.b = defaultdict(lambda: defaultdict(dict)) #b causing an inssue
         self.OPEN = PriorityQueue()
         
         self.tag = {}
@@ -178,14 +178,12 @@ class D_star(object):
             minimum = self.OPEN.get()
             print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
             return minimum[0], minimum[1] #returns state k with associated key value
-        
         return None, -1
 
     def get_wpid(self, waypoint_id):
         for waypoint in self.waypoints:
             if waypoint.id == waypoint_id:
                 return waypoint
-        return None 
     
     #check again
     def insert(self, h_new, state):
@@ -194,22 +192,20 @@ class D_star(object):
         waypoint_id = state.id
         #else:
             #waypoint_id = state
-
-        if h_new is None:
-            state_location = self.world.get_map().get_wpid(waypoint_id).transform.location
-            h_new = self.cost(self.state_space, state_location)
+        state_location = self.world.get_map().get_wpid(waypoint_id).transform.location
+        h_new = self.cost(self.state_space, state_location)
             
         if waypoint_id in self.tag:
-            tag = self.tag[waypoint_id]
+            new_tag = self.tag[waypoint_id]
         else: 
-            tag = 'New'
+            new_tag = 'New'
 
-        if tag == 'Closed':
+        if new_tag == 'Closed':
             self.V.add(state)
             return -1
 
         #check this if loop
-        if tag == 'New' or h_new < self.h.get(waypoint_id, float('inf')):
+        if new_tag == 'New' or h_new < self.h.get(waypoint_id, float('inf')):
             kx = min(self.h.get(waypoint_id, float('inf')), h_new)
             self.OPEN.put((kx, state))
             self.h[waypoint_id] = h_new
@@ -252,7 +248,7 @@ class D_star(object):
                 if y.id not in self.tag:
                     self.tag[y.id] = 'New'
             
-                h_new = self.h[x.id] + self.cost(x, y)
+                h_new = self.h[x.id] + self.cost(x, y) #what does self.h[x.id] return 
                 print(f'h_new: {h_new}')
                 if h_new < self.h[y.id]:
                     self.h[y.id] = h_new
