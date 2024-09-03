@@ -15,7 +15,7 @@ class D_star(object):
         self.resolution = resolution
         self.waypoint = waypoint
         self.obstacle_threshold = 3.0
-        self.b = defaultdict(lambda: defaultdict(dict)) #b causing an inssue
+        self.b = defaultdict(lambda: defaultdict(dict))
         self.OPEN = PriorityQueue()
         
         self.tag = {}
@@ -178,12 +178,14 @@ class D_star(object):
             minimum = self.OPEN.get()
             print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
             return minimum[0], minimum[1] #returns state k with associated key value
+        
         return None, -1
 
     def get_wpid(self, waypoint_id):
         for waypoint in self.waypoints:
             if waypoint.id == waypoint_id:
                 return waypoint
+        return None 
     
     #check again
     def insert(self, h_new, state):
@@ -192,21 +194,27 @@ class D_star(object):
         waypoint_id = state.id
         #else:
             #waypoint_id = state
-        state_location = self.world.get_map().get_wpid(waypoint_id).transform.location
-        h_new = self.cost(self.state_space, state_location)
+
+        if h_new is None:
+            state_location = self.world.get_map().get_wpid(waypoint_id).transform.location
+            h_new = self.cost(self.state_space, state_location)
             
         if waypoint_id in self.tag:
-            new_tag = self.tag[waypoint_id]
+            tag = self.tag[waypoint_id]
         else: 
-            new_tag = 'New'
+            tag = 'New'
 
-        if new_tag == 'Closed':
+        if tag == 'Closed':
             self.V.add(state)
             return -1
 
+        kx = min(self.h.get(waypoint_id, float('inf')), h_new)
+
+        if waypoint_id in self.tag and self.tag[waypoint_id] == 'Open':
+            if kx >= self.h[waypoint_id]:
+                return 
         #check this if loop
-        if new_tag == 'New' or h_new < self.h.get(waypoint_id, float('inf')):
-            kx = min(self.h.get(waypoint_id, float('inf')), h_new)
+        if tag == 'New' or h_new < self.h.get(waypoint_id, float('inf')):
             self.OPEN.put((kx, state))
             self.h[waypoint_id] = h_new
             self.tag[waypoint_id] = 'Open' 
@@ -248,7 +256,7 @@ class D_star(object):
                 if y.id not in self.tag:
                     self.tag[y.id] = 'New'
             
-                h_new = self.h[x.id] + self.cost(x, y) #what does self.h[x.id] return 
+                h_new = self.h[x.id] + self.cost(x, y)
                 print(f'h_new: {h_new}')
                 if h_new < self.h[y.id]:
                     self.h[y.id] = h_new
@@ -314,12 +322,18 @@ class D_star(object):
             print(f'Inserting with cost: {cost_value}')
             self.insert(cost_value, self.state_space)
 
+
     def modify(self, state_space):
         print(f'modify: state_space: {state_space}')
         self.modify_cost()
-        #this while loop will run forever 
+        #this while loop will run forever
+        prev_k = float('inf')
         kmin = self.get_kmin()
         while kmin is not None and kmin < self.h[state_space]:
+            if kmin >= prev_k:
+                print("loop does not increase")
+                break
+            prev_k = kmin
             kmin = self.process_state()
             print(f'process_state returned kmin: {kmin}')
         if kmin is None or kmin >= self.h[state_space]:
@@ -350,9 +364,13 @@ class D_star(object):
         next_waypoint = current_waypoint.next(2.0)
         if next_waypoint:
             next_wp = next_waypoint[0]
+            """
             next_state = (next_wp.transform.location.x, next_wp.transform.location.y, next_wp.transform.location.z)
             if next_state in self.waypoints:
                 children.append(next_state)
+            """
+            if next_wp.transform.location not in [c.transform.location for c in children]:
+                children.append(next_wp)
 
         if current_waypoint.lane_change & carla.LaneChange.Left:
             left_wp = current_waypoint.get_left_lane()
