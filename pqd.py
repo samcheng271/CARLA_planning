@@ -41,6 +41,7 @@ class D_star(object):
         print(f'xt: {self.xt}')
 
     def populate_open(self):
+        #takes wp in front of vehicle not left or right
         next_waypoint = self.state_space.next(self.resolution)
         if next_waypoint: 
             next_wp = next_waypoint[0]
@@ -80,33 +81,44 @@ class D_star(object):
             minimum = self.OPEN.get()
             print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
             return minimum[0], minimum[1] #returns state k with associated key value
-        
         return None, -1
+    
     #check again
     def insert(self, h_new, state):
         waypoint_id = state.id
-
         if waypoint_id not in self.tag:
             self.tag[waypoint_id] = 'New'
     
         new_tag = self.tag[waypoint_id]
+        kmin = self.get_kmin()
     
         if new_tag == 'New':
             kx = h_new
         elif new_tag == 'Open':
-            kx = min(self.h.get(waypoint_id, float('inf')), h_new)
+            kx = min(kmin, h_new)
         elif new_tag == 'Closed':
+            #what is getting stored in h?
+            #properly define h and values that go into it
             kx = min(self.h.get(waypoint_id, float('inf')), h_new)
-            self.tag[waypoint_id] = 'Open'
-        else:
-            raise ValueError(f"Unexpected tag value: {new_tag}")
+            #self.tag[waypoint_id] = 'Open'
+            self.V.add(state)
 
         self.OPEN.put((kx, state))
         self.h[waypoint_id] = h_new
         self.tag[waypoint_id] = 'Open'
 
         print(f'Inserted state {state} with key {kx}')
-        return kx
+
+    def store_h(self, state):
+        if state:
+            #here, create a iteration that stores heuristic values of states 
+            default = state.transform.location.distance(self.xt.transform.location)
+            self.h[state.id] = default
+            
+        if state.id in self.h:
+            #self.x[x.id] = float('inf')
+            h_get = self.h.get(state.id, float('inf'))
+            #should this return something
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
@@ -117,36 +129,38 @@ class D_star(object):
         if x is None: 
             return -1
         
-        if x.id not in self.h:
-            self.h[x.id] = float('inf')
-            default = x.transform.location.distance(self.xt.transform.location)
-            self.h[x.id] = default
-        
         if x.id == self.xt.id:
             print("goal reached")
             return -1
         
+        self.store_h(x)
         self.checkState(x)
         print(f'Checked state: {x}')
         # print(f'x: {x}, kold: {kold}')
-        print(f'h: {self.h}')
-        print(f'b: {self.b}')
+        print(f'h: {self.h}') #len of self.h = 0
+        #print(f'b: {self.b}')
         if x.id not in self.V:
             for y in self.children(x):
                 self.checkState(y)  
                 print(f'Processing child y: {y}')
                 print(f'x.id: {x.id}, self.h[x.id]: {self.h[x.id]}')
                 print(f'Cost(x, y): {self.cost(x, y)}')
+                """
                 if y.id not in self.h:
                     self.h[y.id] = float('inf')
+                """
+                self.store_h(y)
                 if y.id not in self.tag:
                     self.tag[y.id] = 'New'
             
                 h_new = self.h[x.id] + self.cost(x, y)
                 print(f'h_new: {h_new}')
                 if h_new < self.h[y.id]:
+                    #reexamine this part: 1. why is self.h[y.id] getting 
+                    #a new heuristic value when one alr exists 
+                    #2. why is self.b[y.id] getting x? bc x is the parent of y in this case it should be an actual value not an id(corrected, recheck) 
                     self.h[y.id] = h_new
-                    self.b[y.id] = x.id
+                    self.b[y.id] = x
                     self.insert(h_new, y)
 
             if kold < self.h[x.id]:  # raised states
@@ -154,14 +168,15 @@ class D_star(object):
                 for y in self.children(x):
                     print(f'child: {y}')
                     self.checkState(y)
-                    a = self.h[y.id] + self.cost(y, x)
-                    print(f'print a: {a}')
-                    if self.h[y.id] <= kold and self.h[x.id] > self.h[y.id] + self.cost(y, x):
-                        self.b[x.id] = y.id
-                        self.h[x.id] = self.h[y.id] + self.cost(y, x)
+                    heuristic_a = self.h[y.id] + self.cost(y, x)
+                    print(f'heuristic_a: {heuristic_a}')
+                    if self.h[y.id] <= kold and self.h[x.id] > heuristic_a:
+                        self.b[x.id] = y
+                        self.h[x.id] = heuristic_a
 
             if kold == self.h[x.id]:  # lower states 
                 print(f'kold == h[x.id]: {kold} == {self.h[x.id]}')
+                #why is x getting closed here
                 self.tag[x.id] = 'Closed'
                 self.V.add(x)
                 for y in self.children(x):
@@ -171,10 +186,10 @@ class D_star(object):
                     bb = self.h[x.id] + self.cost(x, y)
                     print(f'print bb: {bb}')
                     if self.tag[y.id] == 'New' or \
-                            (self.b[y.id] == x.id and self.h[y.id] != bb) or \
-                            (self.b[y.id] != x.id and self.h[y.id] > bb):
+                            (self.b[y.id] == x and self.h[y.id] != bb) or \
+                            (self.b[y.id] != x and self.h[y.id] > bb):
                         print(f'Insert y: {y} with bb: {bb}')
-                        self.b[y.id] = x.id
+                        self.b[y.id] = x
                         self.insert(bb, y)
             else:
                 print(f'kold != h[x.id]: {kold} != {self.h[x.id]}')
@@ -187,12 +202,12 @@ class D_star(object):
                     if self.tag[y.id] == 'New' or \
                             (self.b[y.id] == x and self.h[y.id] != bb):
                         print(f'insert y: {y} with bb: {bb}')
-                        self.b[y.id] = x.id
+                        self.b[y.id] = x
                         self.insert(bb, y)
-                    elif self.b[y.id] != x.id and self.h[y.id] > bb:
+                    elif self.b[y.id] != x and self.h[y.id] > bb:
                         print(f'insert x: {x} with h[x]: {self.h[x.id]}')
                         self.insert(self.h[x.id], x)
-                    elif self.b[y.id] != x.id and self.h[y.id] > bb and \
+                    elif self.b[y.id] != x and self.h[y.id] > bb and \
                         self.tag[y.id] == 'Closed' and self.h[y.id] == kold:
                         print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
                         self.insert(self.h[y.id], y)
