@@ -3,10 +3,7 @@ import carla
 import numpy as np
 import random
 from collections import defaultdict
-# from queue import PriorityQueue
 from queue import PriorityQueue
-#from PriorityQueue import PriorityQueue, Priority # Make sure you have PriorityQueue.py 
-# and that the built in queue module is commented out
 
 #consider move-robot-how does move-robot compare to move_vehicle 
 class D_star(object):
@@ -25,124 +22,29 @@ class D_star(object):
         self.Path = []
         self.done = False
         self.Obstaclemap = {}
-        #heapq.heapify(self.OPEN)
-
-        # self.client = carla.Client('localhost', 2000)
-        # self.client.set_timeout(10.0)
         self.world = world
         self.map = map
-
-        # #this is already initalizing vehicle to a starting locaiton
-        # vehicle_bp = self.world.get_blueprint_library().filter('vehicle.carlamotors.firetruck')[0]
-        # self.spawn_points = self.world.get_map().get_spawn_points()
-        # self.start_spawn = self.spawn_points[0]
-        # vehicle = self.world.spawn_actor(vehicle_bp, self.start_spawn)
-
         self.vehicle = vehicle
         self.state = self.waypoint
         self.location = self.vehicle.get_location()
         self.state_space = self.map.get_waypoint(self.location, project_to_road=True)
         #print(f"print: {self.state_space}")
-        #self.state_space = self.map.get_waypoint(self.vehicle.get_location())
         self.waypoints = self.map.generate_waypoints(self.resolution)
         print(f"Number of waypoints generated: {len(self.waypoints)}")
         # print(f"waypoint list: {self.waypoints}")
         self.h = {}
-
-        # wp_tuple = self.init_vehicle()
-        # if wp_tuple:
-        #     start_location, goal_location = wp_tuple
-        # print(f'start_location = {start_location}, goal_location = {goal_location}')
         self.start_location = start_location
         self.goal_location = goal_location
-        #self.start_location = self.init_vehicle.parameters[0]
-        #self.goal_location = self.init_vehicle.parameters[1]
-
         self.x0 = self.map.get_waypoint(self.start_location.transform.location)
         print(f'x0: {self.x0}')
         self.xt = self.map.get_waypoint(self.goal_location.transform.location)
         print(f'xt: {self.xt}')
 
-    # def init_vehicle(self):
-    #     try:
-    #         if self.vehicle:
-    #             #self.vehicle is initalized 
-    #             print("Vehicle spawned.")
-    #         else:
-    #             print("Failed to spawn.")
-    #             self.vehicle = None
-    #             return None
-    #     except Exception as e:
-    #         print(f"Failed to connect to Carla: {e}")
-    #         self.vehicle = None
-    #         return None
-
-    #     goal_vehicle = random.choice(self.spawn_points)
-    #     while goal_vehicle.location == self.start_spawn.location:
-    #         goal_vehicle = random.choice(self.spawn_points)
-
-    #     start_waypoint = self.map.get_waypoint(self.start_spawn.location, project_to_road=True)
-    #     end_waypoint = self.map.get_waypoint(goal_vehicle.location, project_to_road=True)
-
-    #     start_end = (start_waypoint, end_waypoint)
-    #     return start_end
-
-    """
-    def get_nearest_state(self, state):
-
-        vehicle_location = self.vehicle.get_location()
-        positive_vehicle = self.vehicle.get_transform().get_forward_vector()
-        print(f'positive_vehicle: {positive_vehicle}')
-        nearest_state = None
-        min_distance = float('inf')
-
-        
-        for state in self.waypoints:
-            state_location = carla.Location(x=(state.transform.location.x), y=(state.transform.location.y), z=(state.transform.location.z))
-            
-            #print(f'statex: {state.transform.location.x}')
-            #print(f'statey: {state.transform.location.y}')
-            #print(f'statez: {state.transform.location.z}')
-        
-            direction_vector = state_location - vehicle_location
-            distance = direction_vector.length()
-            
-            #issue: min distance is sometimes less than distance which is causing the condition to fail 
-            if positive_vehicle.dot(direction_vector) > 0 and distance < min_distance and distance > 5:
-                min_distance = distance
-                nearest_state = state
-
-                if min_distance <= self.resolution:
-                    break
-
-        if nearest_state:
-            nearest_location = carla.Location(x=(nearest_state.transform.location.x), y=(nearest_state.transform.location.y), z=(nearest_state.transform.location.z))
-            print(f'nearest_location: {nearest_location}')
-            min_dist = float('inf')
-            # print(f'get actors:{self.world.get_actors()}')
-            for actor in self.world.get_actors():
-                if isinstance(actor, carla.Vehicle) and actor.id != self.vehicle.id:
-                    obs_location = actor.get_location()
-                    if obs_location.distance(nearest_location) < self.obstacle_threshold:
-                        # If an obstacle is too close, mark this state as invalid
-                        min_dist = min(min_dist, obs_location.distance(nearest_location))
-            if min_dist < self.obstacle_threshold:
-                self.Obstaclemap[nearest_state.id] = True
-                return None
-
-        return nearest_state
-    """
-
     def populate_open(self):
-        # if not self.vehicle:
-        #     return []
         next_waypoint = self.state_space.next(self.resolution)
         if next_waypoint: 
             next_wp = next_waypoint[0]
-            #next_wp_loc = carla.Location(x=next_wp.transform.location.x, y=next_wp.transform.location.y, z=next_wp.transform.location.z)
-            #self.key = self.cost(self.state_space, self.get_nearest_state(self.waypoint))
             self.key = self.cost(self.state_space, next_wp)
-            #print(f'key: {self.key}')
             tup = (self.key, self.state_space)
     
             self.OPEN.put(tup)
@@ -180,45 +82,31 @@ class D_star(object):
             return minimum[0], minimum[1] #returns state k with associated key value
         
         return None, -1
-
-    def get_wpid(self, waypoint_id):
-        for waypoint in self.waypoints:
-            if waypoint.id == waypoint_id:
-                return waypoint
-        return None 
-    
     #check again
     def insert(self, h_new, state):
-        #x is a state
-        #if isinstance(state, carla.Waypoint):
         waypoint_id = state.id
-        #else:
-            #waypoint_id = state
 
-        if h_new is None:
-            state_location = self.world.get_map().get_wpid(waypoint_id).transform.location
-            h_new = self.cost(self.state_space, state_location)
-            
-        if waypoint_id in self.tag:
-            tag = self.tag[waypoint_id]
-        else: 
-            tag = 'New'
+        if waypoint_id not in self.tag:
+            self.tag[waypoint_id] = 'New'
+    
+        new_tag = self.tag[waypoint_id]
+    
+        if new_tag == 'New':
+            kx = h_new
+        elif new_tag == 'Open':
+            kx = min(self.h.get(waypoint_id, float('inf')), h_new)
+        elif new_tag == 'Closed':
+            kx = min(self.h.get(waypoint_id, float('inf')), h_new)
+            self.tag[waypoint_id] = 'Open'
+        else:
+            raise ValueError(f"Unexpected tag value: {new_tag}")
 
-        if tag == 'Closed':
-            self.V.add(state)
-            return -1
+        self.OPEN.put((kx, state))
+        self.h[waypoint_id] = h_new
+        self.tag[waypoint_id] = 'Open'
 
-        kx = min(self.h.get(waypoint_id, float('inf')), h_new)
-
-        if waypoint_id in self.tag and self.tag[waypoint_id] == 'Open':
-            if kx >= self.h[waypoint_id]:
-                return 
-        #check this if loop
-        if tag == 'New' or h_new < self.h.get(waypoint_id, float('inf')):
-            self.OPEN.put((kx, state))
-            self.h[waypoint_id] = h_new
-            self.tag[waypoint_id] = 'Open' 
-            print(f'Inserted state {state} with key {kx}')
+        print(f'Inserted state {state} with key {kx}')
+        return kx
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
@@ -231,8 +119,6 @@ class D_star(object):
         
         if x.id not in self.h:
             self.h[x.id] = float('inf')
-
-        if self.h[x.id] == float('inf'):
             default = x.transform.location.distance(self.xt.transform.location)
             self.h[x.id] = default
         
@@ -341,13 +227,6 @@ class D_star(object):
             return -1 
 
     def cost(self, start, goal):
-        """
-        print(f'Calculating cost from {start} to {goal}')
-        if goal.id in self.Obstaclemap:
-            print(f'Goal {goal.id} is in Obstaclemap')
-            return np.inf
-        """
-
         distance = start.transform.location.distance(goal.transform.location)
         print(f'Distance: {distance}')
         return distance
@@ -364,11 +243,6 @@ class D_star(object):
         next_waypoint = current_waypoint.next(2.0)
         if next_waypoint:
             next_wp = next_waypoint[0]
-            """
-            next_state = (next_wp.transform.location.x, next_wp.transform.location.y, next_wp.transform.location.z)
-            if next_state in self.waypoints:
-                children.append(next_state)
-            """
             if next_wp.transform.location not in [c.transform.location for c in children]:
                 children.append(next_wp)
 
@@ -414,15 +288,11 @@ class D_star(object):
         return path
 
     def run(self):
-
-        #heapq.heappush(self.OPEN, (self.cost(self.x0, self.xt), self.x0))
-        #double check
         self.OPEN.put((self.cost(self.x0, self.xt), self.x0))
-
         print(f'self.tag: {self.tag}')
         print(f'self.x0: {self.x0}')
 
-        #this while loop could potentially be the issue, xt.id is never turning into closed
+        #xt.id is never turning into closed
         #what does it need to make it closed--for it to be in visited?
         while self.tag.get(self.xt.id, 'New') != "Closed":
             print(f"Goal state tag: {self.tag.get(self.xt.id, 'New')}") 
@@ -431,11 +301,6 @@ class D_star(object):
             if kmin == -1:
                 print("No path found.")
                 return
-
-            #for state in self.V: 
-            #state is added to V here but nothing else happens
-            #need to iterate through V set as the algs runs until so the 
-            #condition all of the paths explored are added to this V and eventually x0 == xt
         self.Path = self.path()
         print(f'Path found: {self.Path}')
         self.done = True
