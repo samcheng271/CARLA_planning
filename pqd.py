@@ -53,7 +53,6 @@ class D_star(object):
                     existing_state = item
 
             if existing_state is None:
-            # If no state with the same cost exists, add the new state
                 tup = (self.key, self.state_space)
                 self.OPEN.put(tup)
                 print(f'OPEN tuple insert: {tup}')
@@ -146,7 +145,7 @@ class D_star(object):
         # print(f'x: {x}, kold: {kold}')
         print(f'h: {self.h}') #len of self.h = 0
         #print(f'b: {self.b}')
-        if x.id not in self.V:
+        if x not in self.V:
             for y in self.children(x):
                 self.checkState(y)  
                 print(f'Processing child y: {y}')
@@ -209,12 +208,12 @@ class D_star(object):
                     if self.tag[y.id] == 'New' or \
                             (self.b[y.id] == x and self.h[y.id] != bb):
                         print(f'insert y: {y} with bb: {bb}')
-                        self.b[y.id] = x
+                        self.b[y.id] = x.id
                         self.insert(bb, y)
-                    elif self.b[y.id] != x and self.h[y.id] > bb:
+                    elif self.b[y.id] != x.id and self.h[y.id] > bb:
                         print(f'insert x: {x} with h[x]: {self.h[x.id]}')
                         self.insert(self.h[x.id], x)
-                    elif self.b[y.id] != x and self.h[y.id] > bb and \
+                    elif self.b[y.id] != x.id and self.h[y.id] > bb and \
                         self.tag[y.id] == 'Closed' and self.h[y.id] == kold:
                         print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
                         self.insert(self.h[y.id], y)
@@ -222,9 +221,11 @@ class D_star(object):
         return self.get_kmin()
 
     def modify_cost(self):
-        xparent = self.b[self.state_space]
+        ss_id = self.state_space.id
+        #make sure b is storing states f and xparent is a state
+        xparent = self.b[ss_id]
         print(f'modify_cost: xparent: {xparent}')
-        if self.tag[self.state_space] == 'Closed':
+        if self.tag[ss_id] == 'Closed':
             print(f'state_space {self.state_space} is Closed')
             cost_value = self.h[xparent] + self.cost(self.state_space, xparent)
             print(f'Inserting with cost: {cost_value}')
@@ -237,14 +238,12 @@ class D_star(object):
         #this while loop will run forever
         prev_k = float('inf')
         kmin = self.get_kmin()
-        while kmin is not None and kmin < self.h[state_space]:
-            if kmin >= prev_k:
-                print("loop does not increase")
-                break
+        #this could be causing the inf loop cause kmin is never updates thus always greater than h
+        while kmin is not None and kmin < self.h[state_space.id]: #kmin-start to goal state_space heuristic 
             prev_k = kmin
             kmin = self.process_state()
             print(f'process_state returned kmin: {kmin}')
-        if kmin is None or kmin >= self.h[state_space]:
+        if kmin is None or kmin >= self.h[state_space.id]:
             print(f'kmin {kmin} >= h[state_space] {self.h[state_space]}')
             return -1 
 
@@ -284,33 +283,34 @@ class D_star(object):
 
         return children
 
-    def path(self, goal=None):
-        print(f'path: goal: {goal}')
+    def path(self):
+        print(f'path: goal: {self.goal_location}')
         path = []
         location = []
-        start = self.xt
-        if not goal:
-            x = self.x0
-            print(f'No goal provided, using x0: {x}')
+        end_loc = self.xt
+        if not self.goal_location:
+            trace_state = self.x0
+            print(f'No goal provided, using x0: {end_loc}')
         else:
-            x = goal
-            print(f'Goal provided: {goal}, start: {start}')
+            trace_state = self.goal_location
+            print(f'Goal provided: {self.goal_location}, start: {end_loc}')
 
-        while x != start:
-            if x not in self.b: 
-                break
-            print(f'Appending to path: x: {x}, b[x]: {self.b[x]}')
-            path.append([np.array(x), np.array(self.b[x])])
-            location.append(carla.Location(x=x[0], y=x[1], z=x[2]))
-            x = self.b[x]
+        while trace_state != end_loc:
+            print(f'Appending to path: x: {trace_state}, b[x]: {self.b[trace_state.id]}')
+            path.append([np.array(trace_state), np.array(self.b[trace_state.id])])
+            #why is this appending location
+            location.append(carla.Location(x=trace_state.transform.location.x, y=trace_state.transform.location.y, z=trace_state.transform.location.z))
+            trace_state = self.b[trace_state.id]
 
-        print(f'Appending final location: start: {start}')
-        location.append(carla.Location(x=start[0], y=start[1], z=start[2]))
+        print(f'Appending final location: start: {end_loc}')
+        location.append(carla.Location(x=self.goal_location.transform.location.x, y=self.goal_location.transform.location.y, z=self.goal_location.transform.location.z))
 
-        return path
+        return path, location
 
     def run(self):
         self.OPEN.put((self.cost(self.x0, self.xt), self.x0))
+        #self.OPEN[self.xt] = 0
+        self.tag[self.x0] = 'New'
         print(f'self.tag: {self.tag}')
         print(f'self.x0: {self.x0}')
 
@@ -318,22 +318,28 @@ class D_star(object):
         #what does it need to make it closed--for it to be in visited?
         while self.tag.get(self.xt.id, 'New') != "Closed":
             print(f"Goal state tag: {self.tag.get(self.xt.id, 'New')}") 
-            kmin = self.process_state() #->kmin here is returning -1
+            kmin = self.process_state() 
             print(f'kmin: {kmin}')
             if kmin == -1:
                 print("No path found.")
                 return
+            if self.tag[self.x0] == 'Closed':
+                break
+            self.ind += 1
         self.Path = self.path()
         print(f'Path found: {self.Path}')
         self.done = True
         self.visualize_path(self.Path)
 
         for _ in range(100):
-            self.move_vehicle()
-            s = self.xt
-            while s != self.x0:
-                sparent = self.b.get(s)
-                print(f'Checking state: {s}, parent: {sparent}')
+            #self.move_vehicle()
+            s = self.x0
+            while s != self.xt:
+                if s == self.x0:
+                    sparent = self.b[self.x0]
+                    print(f'Checking state: {s}, parent: {sparent}')
+                else:
+                    sparent = self.b[s.id]
                 if self.cost(s, sparent) == np.inf:
                     print(f'Cost is infinite, modifying state: {s}')
                     self.modify(s)
@@ -348,6 +354,7 @@ class D_star(object):
                 break
 
     #controls vehicle to be moved from one place to another
+    """
     def move_vehicle(self):
         if not self.vehicle:
             print("Vehicle not initialized.")
@@ -361,14 +368,15 @@ class D_star(object):
             self.vehicle.set_location(location)
         else:
             print("Path empty.")
-
+    """
+    
     def visualize_path(self, path):
         debug = self.world.debug
         for segment in path:
             start, end = segment
             debug.draw_line(
-                carla.Location(x=start[0], y=start[1], z=start[2]),
-                carla.Location(x=end[0], y=end[1], z=end[2]),
+                carla.Location(x=self.start_location.transform.location.x, y=self.start_location.transform.location.y, z=self.start_location.transform.location.z),
+                carla.Location(x=self.goal_location.transform.location.x, y=self.goal_location.transform.location.y, z=self.goal_location.transform.location.z),
                 thickness=0.1, color=carla.Color(r=255, g=0, b=0), life_time=15.0
             )
 
