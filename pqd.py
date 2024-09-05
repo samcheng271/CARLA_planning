@@ -46,10 +46,17 @@ class D_star(object):
         if next_waypoint: 
             next_wp = next_waypoint[0]
             self.key = self.cost(self.state_space, next_wp)
-            tup = (self.key, self.state_space)
-    
-            self.OPEN.put(tup)
-            print(f'OPEN tuple insert: {tup}')
+
+            existing_state = None
+            for item in self.OPEN.queue:
+                if item[0] == self.key:
+                    existing_state = item
+
+            if existing_state is None:
+            # If no state with the same cost exists, add the new state
+                tup = (self.key, self.state_space)
+                self.OPEN.put(tup)
+                print(f'OPEN tuple insert: {tup}')
             
         return self.OPEN
 
