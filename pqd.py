@@ -92,6 +92,8 @@ class D_star(object):
     #check again
     def insert(self, h_new, state):
         waypoint_id = state.id
+        heuristic = self.store_h(state)
+
         if waypoint_id not in self.tag:
             self.tag[waypoint_id] = 'New'
     
@@ -105,7 +107,7 @@ class D_star(object):
         elif new_tag == 'Closed':
             #what is getting stored in h?
             #properly define h and values that go into it
-            kx = min(self.h.get(waypoint_id, float('inf')), h_new)
+            kx = min(heuristic, h_new)
             #self.tag[waypoint_id] = 'Open'
             self.V.add(state)
 
@@ -120,11 +122,13 @@ class D_star(object):
             #here, create a iteration that stores heuristic values of states 
             default = state.transform.location.distance(self.xt.transform.location)
             self.h[state.id] = default
+            return default
             
-        if state.id in self.h:
+        elif state.id in self.h:
             #self.x[x.id] = float('inf')
-            h_get = self.h.get(state.id, float('inf'))
-            #should this return something
+            return self.h.get(state.id)
+        else:
+            return float('inf')
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
@@ -286,7 +290,7 @@ class D_star(object):
     def path(self):
         print(f'path: goal: {self.goal_location}')
         path = []
-        location = []
+        #location = []
         end_loc = self.xt
         if not self.goal_location:
             trace_state = self.x0
@@ -298,24 +302,21 @@ class D_star(object):
         while trace_state != end_loc:
             print(f'Appending to path: x: {trace_state}, b[x]: {self.b[trace_state.id]}')
             path.append([np.array(trace_state), np.array(self.b[trace_state.id])])
-            #why is this appending location
-            location.append(carla.Location(x=trace_state.transform.location.x, y=trace_state.transform.location.y, z=trace_state.transform.location.z))
+            #location.append(carla.Location(x=trace_state.transform.location.x, y=trace_state.transform.location.y, z=trace_state.transform.location.z))
             trace_state = self.b[trace_state.id]
 
         print(f'Appending final location: start: {end_loc}')
-        location.append(carla.Location(x=self.goal_location.transform.location.x, y=self.goal_location.transform.location.y, z=self.goal_location.transform.location.z))
+        #location.append(carla.Location(x=self.goal_location.transform.location.x, y=self.goal_location.transform.location.y, z=self.goal_location.transform.location.z))
 
-        return path, location
+        return path
 
     def run(self):
         self.OPEN.put((self.cost(self.x0, self.xt), self.x0))
-        #self.OPEN[self.xt] = 0
+        self.OPEN.put((0, self.xt))
         self.tag[self.x0] = 'New'
         print(f'self.tag: {self.tag}')
         print(f'self.x0: {self.x0}')
 
-        #xt.id is never turning into closed
-        #what does it need to make it closed--for it to be in visited?
         while self.tag.get(self.xt.id, 'New') != "Closed":
             print(f"Goal state tag: {self.tag.get(self.xt.id, 'New')}") 
             kmin = self.process_state() 
