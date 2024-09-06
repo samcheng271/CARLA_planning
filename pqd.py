@@ -12,7 +12,8 @@ class D_star(object):
         self.resolution = resolution
         self.waypoint = waypoint
         self.obstacle_threshold = 3.0
-        self.b = defaultdict(lambda: defaultdict(dict))
+        #self.b = defaultdict(lambda: defaultdict(dict))
+        self.b = {}
         self.OPEN = PriorityQueue()
         
         self.tag = {}
@@ -46,11 +47,12 @@ class D_star(object):
         if next_waypoint: 
             next_wp = next_waypoint[0]
             self.key = self.cost(self.state_space, next_wp)
-
-            existing_state = None
-            for item in self.OPEN.queue:
-                if item[0] == self.key:
-                    existing_state = item
+            print(f'key: {self.key}')
+            #existing_state = None
+            for existing_state in next_waypoint:
+                for item in self.OPEN.queue:
+                    if item[0] == self.key and item[1] == self.state_space:
+                        existing_state = item
 
             if existing_state is None:
                 tup = (self.key, self.state_space)
@@ -66,11 +68,10 @@ class D_star(object):
             print(f'checkState, waypoint_id: {y.id}')
         else:
             waypoint_id = y
-            print(f'checkstate, else: waypoint_id: {y}')
-
         #in unit tests make sure h returns a number and tag returns a string
         if waypoint_id not in self.h:
             self.h[waypoint_id] = 0
+            print(f'checkState, wp_id not in h: {self.h.get(waypoint_id)}')
         if waypoint_id not in self.tag:
             self.tag[waypoint_id] = 'New'
 
@@ -89,7 +90,6 @@ class D_star(object):
             return minimum[0], minimum[1] #returns state k with associated key value
         return None, -1
     
-    #check again
     def insert(self, h_new, state):
         waypoint_id = state.id
         heuristic = self.store_h(state)
@@ -141,7 +141,7 @@ class D_star(object):
         
         if x.id == self.xt.id:
             print("goal reached")
-            return -1
+            #return -1
         
         self.store_h(x)
         self.checkState(x)
@@ -212,12 +212,12 @@ class D_star(object):
                     if self.tag[y.id] == 'New' or \
                             (self.b[y.id] == x and self.h[y.id] != bb):
                         print(f'insert y: {y} with bb: {bb}')
-                        self.b[y.id] = x.id
+                        self.b[y.id] = x
                         self.insert(bb, y)
-                    elif self.b[y.id] != x.id and self.h[y.id] > bb:
+                    elif self.b[y.id] != x and self.h[y.id] > bb:
                         print(f'insert x: {x} with h[x]: {self.h[x.id]}')
                         self.insert(self.h[x.id], x)
-                    elif self.b[y.id] != x.id and self.h[y.id] > bb and \
+                    elif self.b[y.id] != x and self.h[y.id] > bb and \
                         self.tag[y.id] == 'Closed' and self.h[y.id] == kold:
                         print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
                         self.insert(self.h[y.id], y)
@@ -288,7 +288,6 @@ class D_star(object):
         return children
 
     def path(self):
-        print(f'path: goal: {self.goal_location}')
         path = []
         #location = []
         end_loc = self.xt
@@ -296,18 +295,23 @@ class D_star(object):
             trace_state = self.x0
             print(f'No goal provided, using x0: {end_loc}')
         else:
-            trace_state = self.goal_location
+            trace_state = self.x0
             print(f'Goal provided: {self.goal_location}, start: {end_loc}')
 
         while trace_state != end_loc:
-            print(f'Appending to path: x: {trace_state}, b[x]: {self.b[trace_state.id]}')
-            path.append([np.array(trace_state), np.array(self.b[trace_state.id])])
+            #print(f'Appending to path: x: {trace_state}, b[x]: {self.b[trace_state.id]}')
+            #path.append([np.array(trace_state), np.array(self.b[trace_state.id])])
             #location.append(carla.Location(x=trace_state.transform.location.x, y=trace_state.transform.location.y, z=trace_state.transform.location.z))
             trace_state = self.b[trace_state.id]
 
         print(f'Appending final location: start: {end_loc}')
+        parent_state = self.b[trace_state.id]
         #location.append(carla.Location(x=self.goal_location.transform.location.x, y=self.goal_location.transform.location.y, z=self.goal_location.transform.location.z))
-
+        trace_location = np.array([trace_state.transform.location.x, trace_state.transform.location.y, trace_state.transform.location.z])
+        parent_location = np.array([parent_state.transform.location.x, parent_state.transform.location.y, parent_state.transform.location.z])
+        
+        path.append([trace_location, parent_location])
+        trace_state = parent_state
         return path
 
     def run(self):
