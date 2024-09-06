@@ -288,30 +288,30 @@ class D_star(object):
         return children
 
     def path(self):
+        goal = None
         path = []
         #location = []
         end_loc = self.xt
-        if not self.goal_location:
+        if not goal:
             trace_state = self.x0
-            print(f'No goal provided, using x0: {end_loc}')
+            print(f'No goal provided, using x0: {trace_state}')
         else:
-            trace_state = self.x0
+            trace_state = goal
             print(f'Goal provided: {self.goal_location}, start: {end_loc}')
+        start = self.xt
 
-        while trace_state != end_loc:
+        while trace_state != start:
             #print(f'Appending to path: x: {trace_state}, b[x]: {self.b[trace_state.id]}')
             #path.append([np.array(trace_state), np.array(self.b[trace_state.id])])
             #location.append(carla.Location(x=trace_state.transform.location.x, y=trace_state.transform.location.y, z=trace_state.transform.location.z))
-            trace_state = self.b[trace_state.id]
 
-        print(f'Appending final location: start: {end_loc}')
-        parent_state = self.b[trace_state.id]
         #location.append(carla.Location(x=self.goal_location.transform.location.x, y=self.goal_location.transform.location.y, z=self.goal_location.transform.location.z))
-        trace_location = np.array([trace_state.transform.location.x, trace_state.transform.location.y, trace_state.transform.location.z])
-        parent_location = np.array([parent_state.transform.location.x, parent_state.transform.location.y, parent_state.transform.location.z])
+            x = self.b[trace_state.id]
+            trace_location = np.array([trace_state.transform.location.x, trace_state.transform.location.y, trace_state.transform.location.z])
+            parent_location = np.array([x.transform.location.x, x.transform.location.y, x.transform.location.z])
+            path.append([trace_location, parent_location])
+            
         
-        path.append([trace_location, parent_location])
-        trace_state = parent_state
         return path
 
     def run(self):
@@ -323,11 +323,15 @@ class D_star(object):
 
         while self.tag.get(self.xt.id, 'New') != "Closed":
             print(f"Goal state tag: {self.tag.get(self.xt.id, 'New')}") 
+            self.process_state()
+            """
             kmin = self.process_state() 
+
             print(f'kmin: {kmin}')
             if kmin == -1:
                 print("No path found.")
                 return
+            """
             if self.tag[self.x0] == 'Closed':
                 break
             self.ind += 1
