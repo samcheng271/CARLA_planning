@@ -315,13 +315,14 @@ class D_star(object):
         return path
 
     def run(self):
+
         self.OPEN.put((self.cost(self.x0, self.xt), self.x0))
         self.OPEN.put((0, self.xt))
         self.tag[self.x0] = 'New'
         print(f'self.tag: {self.tag}')
         print(f'self.x0: {self.x0}')
 
-        while self.tag.get(self.xt.id, 'New') != "Closed":
+        while self.tag.get(self.state_space.id, 'New') != "Closed":
             print(f"Goal state tag: {self.tag.get(self.xt.id, 'New')}") 
             self.process_state()
             """
@@ -332,7 +333,7 @@ class D_star(object):
                 print("No path found.")
                 return
             """
-            if self.tag[self.x0] == 'Closed':
+            if self.tag[self.state_space.id] == 'Closed':
                 break
             self.ind += 1
         self.Path = self.path()
@@ -345,7 +346,7 @@ class D_star(object):
             s = self.x0
             while s != self.xt:
                 if s == self.x0:
-                    sparent = self.b[self.x0]
+                    sparent = self.b[self.x0.id]
                     print(f'Checking state: {s}, parent: {sparent}')
                 else:
                     sparent = self.b[s.id]
