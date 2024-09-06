@@ -310,7 +310,7 @@ class D_star(object):
             trace_location = np.array([trace_state.transform.location.x, trace_state.transform.location.y, trace_state.transform.location.z])
             parent_location = np.array([x.transform.location.x, x.transform.location.y, x.transform.location.z])
             path.append([trace_location, parent_location])
-            
+            print(f"path append: {x}")
         
         return path
 
