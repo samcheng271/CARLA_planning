@@ -7,7 +7,8 @@ from queue import PriorityQueue
 
 #consider move-robot-how does move-robot compare to move_vehicle 
 class D_star(object):
-    def __init__(self, waypoint, start_location, goal_location, vehicle, world, map, resolution=2.0):
+    #def __init__(self, waypoint, start_location, goal_location, vehicle, world, map, resolution=2.0):
+    def __init__(self, waypoint, start_waypoint, end_waypoint, vehicle, world, map, resolution=2.0):
         self.settings = 'CollisionChecking'
         self.resolution = resolution
         self.waypoint = waypoint
@@ -34,13 +35,16 @@ class D_star(object):
         print(f"Number of waypoints generated: {len(self.waypoints)}")
         # print(f"waypoint list: {self.waypoints}")
         self.h = {}
-        self.start_location = start_location
-        self.goal_location = goal_location
-        self.x0 = self.map.get_waypoint(self.start_location.transform.location)
+        #self.start_location = start_location
+        #self.goal_location = goal_location
+        #self.x0 = self.map.get_waypoint(self.start_location.transform.location)
+        self.x0 = start_waypoint
         print(f'x0: {self.x0}')
-        self.xt = self.map.get_waypoint(self.goal_location.transform.location)
+        #self.xt = self.map.get_waypoint(self.goal_location.transform.location)
+        self.xt = end_waypoint
         print(f'xt: {self.xt}')
 
+    """
     def populate_open(self):
         #takes wp in front of vehicle not left or right
         next_waypoint = self.state_space.next(self.resolution)
@@ -60,18 +64,89 @@ class D_star(object):
                 print(f'OPEN tuple insert: {tup}')
             
         return self.OPEN
+    """
+    def get_nearby_waypoints(self, radius=50.0):
+        vehicle_location = self.vehicle.get_location()
+        nearby_waypoints = []
 
+        for wp in self.waypoints:
+            wp_location = wp.transform.location
+            if wp_location.distance(vehicle_location) <= radius:
+                nearby_waypoints.append(wp)
+
+        return nearby_waypoints
+
+    def populate_open(self):
+        nearby_waypoints = self.get_nearby_waypoints(radius=50.0)
+    
+        for wp in nearby_waypoints:
+            nearest_state = self.get_nearest_state(wp)
+            if nearest_state:
+                key = self.cost(wp, nearest_state)
+                print(f'key: {key}')
+                tup = (key, wp)
+                self.OPEN.put(tup)
+                print(f'OPEN tuple insert: {tup}')
+        return self.OPEN
+
+    
+    def get_nearest_state(self, state):
+
+        nearest_state = None
+        min_distance = float('inf')
+
+        nearby_waypoints = self.get_nearby_waypoints(radius=50.0)
+
+        for state in nearby_waypoints:
+            state_location = carla.Location(
+                x=(state.transform.location.x),
+                y=(state.transform.location.y),
+                z=(state.transform.location.z)
+            )
+
+            direction_vector = state_location - self.location
+            distance = direction_vector.length()
+
+        
+            if distance < min_distance and distance > 5:
+                min_distance = distance
+                nearest_state = state
+
+                if min_distance <= self.resolution:
+                    break
+        """
+        if nearest_state:
+            nearest_location = carla.Location(
+                x=(nearest_state.transform.location.x),
+                y=(nearest_state.transform.location.y),
+                z=(nearest_state.transform.location.z)
+            )
+            min_dist = float('inf')
+
+            for actor in self.world.get_actors():
+                if isinstance(actor, carla.Vehicle) and actor.id != self.vehicle.id:
+                    obs_location = actor.get_location()
+                    if obs_location.distance(nearest_location) < self.obstacle_threshold:
+                    # If an obstacle is too close, mark this state as invalid
+                        min_dist = min(min_dist, obs_location.distance(nearest_location))
+            if min_dist < self.obstacle_threshold:
+                self.Obstaclemap[nearest_state.id] = True
+                return None
+        """
+        return nearest_state
+
+    
     # Checks if a 'y' state has both heuristic and tag dicts
     def checkState(self, y):
         if isinstance(y, carla.Waypoint):
             waypoint_id = y.id
-            print(f'checkState, waypoint_id: {y.id}')
+            #print(f'checkState, waypoint_id: {y.id}')
         else:
             waypoint_id = y
         #in unit tests make sure h returns a number and tag returns a string
         if waypoint_id not in self.h:
             self.h[waypoint_id] = 0
-            print(f'checkState, wp_id not in h: {self.h.get(waypoint_id)}')
+            #print(f'checkState, wp_id not in h: {self.h.get(waypoint_id)}')
         if waypoint_id not in self.tag:
             self.tag[waypoint_id] = 'New'
 
@@ -115,7 +190,7 @@ class D_star(object):
         self.h[waypoint_id] = h_new
         self.tag[waypoint_id] = 'Open'
 
-        print(f'Inserted state {state} with key {kx}')
+        #print(f'Inserted state {state} with key {kx}')
 
     def store_h(self, state):
         if state:
@@ -126,7 +201,7 @@ class D_star(object):
             
         elif state.id in self.h:
             #self.x[x.id] = float('inf')
-            return self.h.get(state.id)
+            return self.h.get(state.id, float('inf'))
         else:
             return float('inf')
 
@@ -145,16 +220,16 @@ class D_star(object):
         
         self.store_h(x)
         self.checkState(x)
-        print(f'Checked state: {x}')
+        #print(f'Checked state: {x}')
         # print(f'x: {x}, kold: {kold}')
-        print(f'h: {self.h}') #len of self.h = 0
+        #print(f'h: {self.h}') #len of self.h = 0
         #print(f'b: {self.b}')
         if x not in self.V:
             for y in self.children(x):
                 self.checkState(y)  
-                print(f'Processing child y: {y}')
-                print(f'x.id: {x.id}, self.h[x.id]: {self.h[x.id]}')
-                print(f'Cost(x, y): {self.cost(x, y)}')
+                #print(f'Processing child y: {y}')
+                #print(f'x.id: {x.id}, self.h[x.id]: {self.h[x.id]}')
+                #print(f'Cost(x, y): {self.cost(x, y)}')
                 """
                 if y.id not in self.h:
                     self.h[y.id] = float('inf')
@@ -164,7 +239,7 @@ class D_star(object):
                     self.tag[y.id] = 'New'
             
                 h_new = self.h[x.id] + self.cost(x, y)
-                print(f'h_new: {h_new}')
+                #print(f'h_new: {h_new}')
                 if h_new < self.h[y.id]:
                     #reexamine this part: 1. why is self.h[y.id] getting 
                     #a new heuristic value when one alr exists 
@@ -194,6 +269,7 @@ class D_star(object):
                     print(f'child: {y}')
                     self.checkState(y)
                     bb = self.h[x.id] + self.cost(x, y)
+                    print(f'h[x.id]: {self.h[x.id]}')
                     print(f'print bb: {bb}')
                     if self.tag[y.id] == 'New' or \
                             (self.b[y.id] == x and self.h[y.id] != bb) or \
@@ -222,6 +298,9 @@ class D_star(object):
                         print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
                         self.insert(self.h[y.id], y)
             print("No min")
+
+            if self.tag.get(x.id, 'New') == 'Closed' and x == self.xt and x in self.V:
+                print(f'reached destination')
         return self.get_kmin()
 
     def modify_cost(self):
@@ -288,19 +367,19 @@ class D_star(object):
         return children
 
     def path(self):
-        goal = None
+        goal = self.xt
         path = []
         #location = []
-        end_loc = self.xt
+        
         if not goal:
             trace_state = self.x0
             print(f'No goal provided, using x0: {trace_state}')
         else:
             trace_state = goal
-            print(f'Goal provided: {self.goal_location}, start: {end_loc}')
-        start = self.xt
+            print(f'Goal provided: {self.goal_location}, start: {self.x0}')
+        #start = self.xt
 
-        while trace_state != start:
+        while trace_state != self.x0:
             #print(f'Appending to path: x: {trace_state}, b[x]: {self.b[trace_state.id]}')
             #path.append([np.array(trace_state), np.array(self.b[trace_state.id])])
             #location.append(carla.Location(x=trace_state.transform.location.x, y=trace_state.transform.location.y, z=trace_state.transform.location.z))
@@ -310,6 +389,8 @@ class D_star(object):
             trace_location = np.array([trace_state.transform.location.x, trace_state.transform.location.y, trace_state.transform.location.z])
             parent_location = np.array([x.transform.location.x, x.transform.location.y, x.transform.location.z])
             path.append([trace_location, parent_location])
+
+            trace_state = x
             print(f"path append: {x}")
         
         return path
@@ -342,7 +423,7 @@ class D_star(object):
         self.visualize_path(self.Path)
 
         for _ in range(100):
-            #self.move_vehicle()
+            self.move_vehicle()
             s = self.x0
             while s != self.xt:
                 if s == self.x0:
@@ -364,7 +445,7 @@ class D_star(object):
                 break
 
     #controls vehicle to be moved from one place to another
-    """
+    
     def move_vehicle(self):
         if not self.vehicle:
             print("Vehicle not initialized.")
@@ -373,20 +454,20 @@ class D_star(object):
         if self.Path:
             next_waypoint = self.Path[0]
             print(f'Next waypoint: {next_waypoint}')
-            location = carla.Location(x=next_waypoint[0][0], y=next_waypoint[0][1], z=next_waypoint[0][2])
+            location = carla.Location(next_waypoint.transform.location.x, next_waypoint.transform.location.y, next_waypoint.transform.location.z)
             print(f'Setting vehicle location to: {location}')
             self.vehicle.set_location(location)
         else:
             print("Path empty.")
-    """
+    
     
     def visualize_path(self, path):
         debug = self.world.debug
         for segment in path:
             start, end = segment
             debug.draw_line(
-                carla.Location(x=self.start_location.transform.location.x, y=self.start_location.transform.location.y, z=self.start_location.transform.location.z),
-                carla.Location(x=self.goal_location.transform.location.x, y=self.goal_location.transform.location.y, z=self.goal_location.transform.location.z),
+                carla.Location(x=self.x0.transform.location.x, y=self.x0.transform.location.y, z=self.x0.transform.location.z),
+                carla.Location(x=self.xt.transform.location.x, y=self.xt.transform.location.y, z=self.xt.transform.location.z),
                 thickness=0.1, color=carla.Color(r=255, g=0, b=0), life_time=15.0
             )
 
@@ -405,11 +486,11 @@ if __name__ == '__main__':
 
 
     # Choose a random starting location (point A)
-    point_a = spawn_points[0]
+    point_a = random.choice(spawn_points)
     firetruck = world.spawn_actor(firetruck_bp, point_a)
     # Choose a random destination (point B)
     point_b = random.choice(spawn_points)
-    while point_b.location == point_a.location:
+    if point_b.location == point_a.location:
         point_b = random.choice(spawn_points)
 
     start_waypoint = carla_map.get_waypoint(point_a.location)
