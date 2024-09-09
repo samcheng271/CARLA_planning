@@ -66,60 +66,44 @@ class D_star(object):
                 print(f'OPEN tuple insert: {tup}')
             
         return self.OPEN
-    """
+    
     def get_nearby_waypoints(self, radius=50.0):
         vehicle_location = self.vehicle.get_location()
         nearby_waypoints = []
-
         for wp in self.waypoints:
             wp_location = wp.transform.location
-            print(f"get_nearby_wps: wp_location: {wp_location}")
             if wp_location.distance(vehicle_location) <= radius:
                 nearby_waypoints.append(wp)
-
         return nearby_waypoints
 
     def populate_open(self):
         nearby_waypoints = self.get_nearby_waypoints(radius=50.0)
-    
         for wp in nearby_waypoints:
-            nearest_state = self.get_nearest_state(wp, nearby_waypoints)
-            if nearest_state is None:
-                continue
-            
-            self.key = self.cost(self.state_space, nearest_state)
-        
-            if not any(item[0] == self.key and item[1] == nearest_state for item in self.OPEN.queue):
-                tup = (self.key, self.state_space)
+            key = self.cost(self.state_space, wp)
+            if not any(item[0] == self.key and item[1] == wp for item in self.OPEN.queue):
+                tup = (key, wp)
                 self.OPEN.put(tup)
-    
         return self.OPEN
-
-    
-    def get_nearest_state(self, state, nearby_waypoints):
-
+                 
+    def get_nearest_state(self, target_location):
         nearest_state = None
         min_distance = float('inf')
-
+        nearby_waypoints = self.get_nearby_waypoints(radius=50.0)
+    
         for state in nearby_waypoints:
             state_location = carla.Location(
-                x=(state.transform.location.x),
-                y=(state.transform.location.y),
-                z=(state.transform.location.z)
-            )
-
-            direction_vector = state_location - self.location
-            distance = direction_vector.length()
-
-            if distance < min_distance and distance > 5:
+                 x=(state.transform.location.x),
+                 y=(state.transform.location.y),
+                 z=(state.transform.location.z)
+             )
+            
+            distance = state_location.distance(target_location)
+            if distance < min_distance and distance > self.resolution:
                 min_distance = distance
                 nearest_state = state
-
-                if min_distance <= self.resolution:
-                    break
-
+    
         return nearest_state
-        """
+        
         if nearest_state:
             nearest_location = carla.Location(
                 x=(nearest_state.transform.location.x),
@@ -138,8 +122,18 @@ class D_star(object):
                 self.Obstaclemap[nearest_state.id] = True
                 return None
         """
+    def populate_open(self):
+        current_waypoint = self.map.get_waypoint(self.vehicle.get_location(), project_to_road=True)
+        child_waypoints = self.children(current_waypoint)
 
-    
+        for child in child_waypoints:
+            key = self.cost(current_waypoint, child)
+            if not any(item[1] == child for item in self.OPEN.queue):
+                tup = (key, child)
+                self.OPEN.put(tup)
+                print(f"Added to OPEN: {tup}")
+        return self.OPEN
+
     # Checks if a 'y' state has both heuristic and tag dicts
     def checkState(self, y):
         if isinstance(y, carla.Waypoint):
