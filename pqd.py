@@ -44,95 +44,17 @@ class D_star(object):
         self.xt = end_waypoint
         print(f'xt: {self.xt}')
 
-    """
     def populate_open(self):
-        #takes wp in front of vehicle not left or right
-        next_waypoint = self.state_space.next(self.resolution)
-        for wp in next_waypoint: 
-            
-        if next_waypoint: 
-            next_wp = next_waypoint[0]
-            self.key = self.cost(self.state_space, next_wp)
-            print(f'key: {self.key}')
-            #existing_state = None
-            for existing_state in next_waypoint:
-                for item in self.OPEN.queue:
-                    if item[0] == self.key and item[1] == self.state_space:
-                        existing_state = item
-
-            if existing_state is None:
-                tup = (self.key, self.state_space)
-                self.OPEN.put(tup)
-                print(f'OPEN tuple insert: {tup}')
-            
-        return self.OPEN
-    
-    def get_nearby_waypoints(self, radius=50.0):
-        vehicle_location = self.vehicle.get_location()
-        nearby_waypoints = []
-        for wp in self.waypoints:
-            wp_location = wp.transform.location
-            if wp_location.distance(vehicle_location) <= radius:
-                nearby_waypoints.append(wp)
-        return nearby_waypoints
-
-    def populate_open(self):
-        nearby_waypoints = self.get_nearby_waypoints(radius=50.0)
-        for wp in nearby_waypoints:
-            key = self.cost(self.state_space, wp)
-            if not any(item[0] == self.key and item[1] == wp for item in self.OPEN.queue):
-                tup = (key, wp)
-                self.OPEN.put(tup)
-        return self.OPEN
-                 
-    def get_nearest_state(self, target_location):
-        nearest_state = None
-        min_distance = float('inf')
-        nearby_waypoints = self.get_nearby_waypoints(radius=50.0)
-    
-        for state in nearby_waypoints:
-            state_location = carla.Location(
-                 x=(state.transform.location.x),
-                 y=(state.transform.location.y),
-                 z=(state.transform.location.z)
-             )
-            
-            distance = state_location.distance(target_location)
-            if distance < min_distance and distance > self.resolution:
-                min_distance = distance
-                nearest_state = state
-    
-        return nearest_state
-        
-        if nearest_state:
-            nearest_location = carla.Location(
-                x=(nearest_state.transform.location.x),
-                y=(nearest_state.transform.location.y),
-                z=(nearest_state.transform.location.z)
-            )
-            min_dist = float('inf')
-
-            for actor in self.world.get_actors():
-                if isinstance(actor, carla.Vehicle) and actor.id != self.vehicle.id:
-                    obs_location = actor.get_location()
-                    if obs_location.distance(nearest_location) < self.obstacle_threshold:
-                    # If an obstacle is too close, mark this state as invalid
-                        min_dist = min(min_dist, obs_location.distance(nearest_location))
-            if min_dist < self.obstacle_threshold:
-                self.Obstaclemap[nearest_state.id] = True
-                return None
-        """
-    def populate_open(self):
-        current_waypoint = self.map.get_waypoint(self.vehicle.get_location(), project_to_road=True)
-        child_waypoints = self.children(current_waypoint)
+        child_waypoints = self.children(self.state_space)
 
         for child in child_waypoints:
-            key = self.cost(current_waypoint, child)
-            if not any(item[1] == child for item in self.OPEN.queue):
-                tup = (key, child)
-                self.OPEN.put(tup)
-                print(f"Added to OPEN: {tup}")
-        return self.OPEN
+            key = self.cost(self.state_space, child)
+            for item in self.OPEN.queue:
+                if item[0] == key and item[1] == self.state_space:
+                    tup = (key, child)
+                    self.OPEN.put(tup)
+                    print(f"Added to OPEN: {tup}")
+            return self.OPEN
 
     # Checks if a 'y' state has both heuristic and tag dicts
     def checkState(self, y):
@@ -144,6 +66,7 @@ class D_star(object):
         #in unit tests make sure h returns a number and tag returns a string
         if waypoint_id not in self.h:
             self.h[waypoint_id] = 0
+            #self.store_h(y)
             print(f'checkState, wp_id not in h: {self.h.get(waypoint_id)}')
         if waypoint_id not in self.tag:
             self.tag[waypoint_id] = 'New'
@@ -178,8 +101,6 @@ class D_star(object):
         elif new_tag == 'Open':
             kx = min(kmin, h_new)
         elif new_tag == 'Closed':
-            #what is getting stored in h?
-            #properly define h and values that go into it
             kx = min(heuristic, h_new)
             #self.tag[waypoint_id] = 'Open'
             self.V.add(state)
@@ -191,17 +112,15 @@ class D_star(object):
         print(f'Inserted state {state} with key {kx}')
 
     def store_h(self, state):
-        if state:
-            #here, create a iteration that stores heuristic values of states 
-            default = state.transform.location.distance(self.xt.transform.location)
-            self.h[state.id] = default
-            return default
-            
-        elif state.id in self.h:
-            #self.x[x.id] = float('inf')
-            return self.h.get(state.id, float('inf'))
-        else:
+        if state is None:
             return float('inf')
+    
+        if state.id not in self.h:
+            heuristic = state.transform.location.distance(self.xt.transform.location)
+            self.h[state.id] = heuristic
+    
+        return self.h[state.id]
+
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
@@ -238,10 +157,7 @@ class D_star(object):
             
                 h_new = self.h[x.id] + self.cost(x, y)
                 #print(f'h_new: {h_new}')
-                if h_new < self.h[y.id]:
-                    #reexamine this part: 1. why is self.h[y.id] getting 
-                    #a new heuristic value when one alr exists 
-                    #2. why is self.b[y.id] getting x? bc x is the parent of y in this case it should be an actual value not an id(corrected, recheck) 
+                if h_new < self.h[y.id]: 
                     self.h[y.id] = h_new
                     self.b[y.id] = x
                     self.insert(h_new, y)
@@ -259,7 +175,6 @@ class D_star(object):
 
             if kold == self.h[x.id]:  # lower states 
                 print(f'kold == h[x.id]: {kold} == {self.h[x.id]}')
-                #why is x getting closed here
                 self.tag[x.id] = 'Closed'
                 self.V.add(x)
                 for y in self.children(x):
@@ -301,21 +216,21 @@ class D_star(object):
                 print(f'reached destination')
         return self.get_kmin()
 
-    def modify_cost(self):
-        ss_id = self.state_space.id
+    def modify_cost(self, state_space):
+        ss_id = state_space.id
         #make sure b is storing states f and xparent is a state
         xparent = self.b[ss_id]
         print(f'modify_cost: xparent: {xparent}')
         if self.tag[ss_id] == 'Closed':
-            print(f'state_space {self.state_space} is Closed')
-            cost_value = self.h[xparent] + self.cost(self.state_space, xparent)
+            print(f'state_space {state_space} is Closed')
+            cost_value = self.h[xparent.id] + self.cost(state_space, xparent)
             print(f'Inserting with cost: {cost_value}')
-            self.insert(cost_value, self.state_space)
+            self.insert(cost_value, state_space)
 
 
     def modify(self, state_space):
         print(f'modify: state_space: {state_space}')
-        self.modify_cost()
+        self.modify_cost(state_space)
         #this while loop will run forever
         #prev_k = float('inf')
         kmin = self.get_kmin()
@@ -325,7 +240,7 @@ class D_star(object):
             kmin = self.process_state()
             print(f'process_state returned kmin: {kmin}')
         if kmin is None or kmin >= self.h[state_space.id]:
-            print(f'kmin {kmin} >= h[state_space] {self.h[state_space]}')
+            print(f'kmin {kmin} >= h[state_space] {self.h[state_space.id]}')
             return -1 
 
     def cost(self, start, goal):
@@ -396,7 +311,7 @@ class D_star(object):
     def run(self):
 
         self.OPEN.put((self.cost(self.x0, self.xt), self.x0))
-        self.OPEN.put((0, self.xt))
+        #self.OPEN.put((0, self.xt))
         self.tag[self.x0] = 'New'
         print(f'self.tag: {self.tag}')
         print(f'self.x0: {self.x0}')
