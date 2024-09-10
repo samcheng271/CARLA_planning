@@ -164,11 +164,22 @@ class DStarLite:
                 self.g[u.id] = float('inf')
                 pred = predescessors(u)
                 # pred.append(u)
+                # for i in range(len(self.all_waypoints)-3):
+                #     self.world.debug.draw_string(self.all_waypoints[i].transform.location, f'{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=3.0, persistent_lines=True)
+                
+                # print(f'predescessors(self.all_waypoints[8291]): {predescessors(self.all_waypoints[8291])}')
+                # self.world.debug.draw_string(self.all_waypoints[8291].transform.location, 'x', draw_shadow=False, color=carla.Color(r=0, g=0, b=220), life_time=30.0, persistent_lines=True)
+                # for i in predescessors(self.all_waypoints[8291]):
+                #     self.world.debug.draw_string(i.transform.location, 'P', draw_shadow=False, color=carla.Color(r=0, g=0, b=220), life_time=30.0, persistent_lines=True)
+                    
+                # z = self.all_waypoints[5]
+                # if current waypoint -4 is not nearby then:
+                # what if i use predescessors, then for each waypoint in pred,
+                # i check what waypoints are close by to them in self.all_waypoints
+                # also check if they are a legal lane change to avoid getting waypoints on opposite lane
+                # use dictionary to store and lookup
 
-                # for i in range(5, 50):
-                #     self.world.debug.draw_string(self.all_waypoints[i].transform.location, f'{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
-
-                z = self.all_waypoints[5]
+                
 
                 # a = self.all_waypoints[6]
                 # b = self.all_waypoints[7]
@@ -179,7 +190,7 @@ class DStarLite:
                 # f = self.all_waypoints[11]
                 # g = self.all_waypoints[12]
                 # h = self.all_waypoints[13]
-                self.world.debug.draw_string(z.transform.location, 'Z', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
+                # self.world.debug.draw_string(z.transform.location, 'Z', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
                 # self.world.debug.draw_string(a.transform.location, 'A', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
                 # self.world.debug.draw_string(b.transform.location, 'B', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
                 # self.world.debug.draw_string(c.transform.location, 'C', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
@@ -190,9 +201,9 @@ class DStarLite:
                 # self.world.debug.draw_string(h.transform.location, 'H', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
                 # self.world.debug.draw_string(u.transform.location, 'U', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
                 # self.prev_check(u)
-                for i,j in self.map.get_topology():
-                    print(f'i {i} j {j}')
-                    self.world.debug.draw_string(i.transform.location, 'W', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
+                # for i,j in self.map.get_topology():
+                #     print(f'i {i} j {j}')
+                #     self.world.debug.draw_string(i.transform.location, 'W', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
 
                 # for s in pred:
                 #     # self.prev_check(u)
@@ -208,16 +219,16 @@ class DStarLite:
                     # g=self.g_old
                     # print(f'y {y}')
                     # print(f'g {g}')
-                    print(f'pred s:: {s}')
-                    print(f'pred start:: {self.start}')
-                    print(f'pred goal id:: {self.goal.id}')
-                    x = self.map.get_waypoint(self.goal.transform.location, project_to_road=True)
-                    print(f'x {x.id}')
-                    print(f'pred goal:: {self.goal}')
-                    print(f'x {x}')
-                    print(f's.id {s.id}')
-                    print(f'self.rhs## {self.rhs[s.id]}')
-                    self.world.debug.draw_string(pred[0].transform.location, 'X', draw_shadow=False, color=carla.Color(r=220, g=0, b=220), life_time=60.0, persistent_lines=True)
+                    # print(f'pred s:: {s}')
+                    # print(f'pred start:: {self.start}')
+                    # print(f'pred goal id:: {self.goal.id}')
+                    # x = self.map.get_waypoint(self.goal.transform.location, project_to_road=True)
+                    # print(f'x {x.id}')
+                    # print(f'pred goal:: {self.goal}')
+                    # print(f'x {x}')
+                    # print(f's.id {s.id}')
+                    # print(f'self.rhs## {self.rhs[s.id]}')
+                    # self.world.debug.draw_string(pred[0].transform.location, 'X', draw_shadow=False, color=carla.Color(r=220, g=0, b=220), life_time=60.0, persistent_lines=True)
                     if self.rhs[s.id] == (self.heuristic_c(s, u) + self.g_old):
                         if s != self.s_goal:#?????
                             min_s = float('inf')
@@ -230,7 +241,7 @@ class DStarLite:
                                 temp = min( self.heuristic_c(s, s_) + self.g[s_.id], min_s)
                             self.rhs[s.id] = min_s
                     self.update_vertex(u)
-
+               
     def main(self):
         self.s_last = self.start
         self.s_current = self.start
