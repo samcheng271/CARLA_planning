@@ -5,6 +5,8 @@ import random
 from collections import defaultdict
 from queue import PriorityQueue
 
+#functions that could be causing issues: 1. populate_open, insert, modify/modify_cost, run
+#^functions are logically correct but waypoint handling maybe causing errors 
 class D_star(object):
     #def __init__(self, waypoint, start_location, goal_location, vehicle, world, map, resolution=2.0):
     def __init__(self, waypoint, start_waypoint, end_waypoint, vehicle, world, map, resolution=2.0):
@@ -37,8 +39,11 @@ class D_star(object):
         self.xt = end_waypoint
         print(f'xt: {self.xt}')
 
-    
+    #waypoint comparison error in priority queue, same waypoints are used again->same 
+    # keys are used which causes waypoints to be compared instead in the tuple->not 
+    # allowed in priority queue calculations thus error occurs
     def populate_open(self):
+        #temp sol: recalcuate child waypoints when the same waypoints are used again
         if self.next_waypoint:
             child_waypoints = [self.next_waypoint]
             self.next_waypoint = None
@@ -108,6 +113,7 @@ class D_star(object):
             return minimum[0], minimum[1] #returns state k with associated key value
         return None, -1
     
+    #make sure tags are updated correctly 
     def insert(self, h_new, state):
         heuristic = self.store_h(state)
 
@@ -238,12 +244,13 @@ class D_star(object):
                 print(f'reached destination, create logic here')
         return self.get_kmin()
 
+    #modify_cost/modify are both logically correct acc to D*, but parent/pred 
+    # calculations need to be rechecked 
     def modify_cost(self, state_space):
         ss_id = state_space.id
         
         xparent = self.b[ss_id]
         print(f'modify_cost: xparent: {xparent}')
-        #if loop causing a key error because: 1. ss_id is not in self.h, 2. x
         if self.tag[ss_id] == 'Closed':
             print(f'state_space {state_space} is Closed')
             print("6")
@@ -339,7 +346,8 @@ class D_star(object):
 
         while self.tag.get(self.state_space.id, 'New') != "Closed":
             self.process_state()
-            
+
+            #if loop causing a key error because: 1. ss_id is not in self.h(incorrectly accessed or not initalized in self.h)
             if self.tag[self.state_space.id] == 'Closed':
                 break
             self.ind += 1
