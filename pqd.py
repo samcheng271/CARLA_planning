@@ -82,19 +82,22 @@ class D_star(object):
     
         return self.OPEN
     
-    # Checks if a 'y' state has both heuristic and tag dicts
+   # Checks if a 'y' state has both heuristic and tag dicts
     def checkState(self, y):
         if isinstance(y, carla.Waypoint):
             waypoint_id = y.id
-            print(f'checkState, waypoint_id: {y.id}')
         else:
             waypoint_id = y
-        #in unit tests make sure h returns a number and tag returns a string
+
         if waypoint_id not in self.h:
-            self.h[waypoint_id] = 0
-            print(f'checkState, wp_id not in h: {self.h.get(waypoint_id)}')
+            heuristic = self.store_h(y)
+            self.h[waypoint_id] = heuristic 
+            #self.h[waypoint_id] = 0
+            print(f'Heuristic for state {waypoint_id} with {self.h[waypoint_id]}')
+
         if waypoint_id not in self.tag:
             self.tag[waypoint_id] = 'New'
+            print(f'Tag for state {waypoint_id} with {self.tag[waypoint_id]}')
     
     def get_kmin(self):
         if self.OPEN:

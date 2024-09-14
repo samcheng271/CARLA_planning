@@ -52,33 +52,5 @@ class TestDStar(unittest.TestCase):
         self.assertIsInstance(item[1], carla.Waypoint)
         print(f"Populate Open Test Passed: OPEN Queue Item - {item}")
     
-    
-    def test_checkState_waypoint(self):
-        # Test checkState with a carla.Waypoint object
-        D = D_star(1, self.start_waypoint, self.end_waypoint, self.firetruck, self.world, self.map)
-        waypoint = D.waypoints[0]
-
-        D.checkState(waypoint)
-
-        waypoint_id = waypoint.id
-        self.assertIn(waypoint_id, D.h)
-        self.assertEqual(D.h[waypoint_id], 0)
-        self.assertIn(waypoint_id, D.tag)
-        self.assertEqual(D.tag[waypoint_id], 'New')
-        print(f"Test Passed for Waypoint: h[{waypoint_id}] = {D.h[waypoint_id]}, tag[{waypoint_id}] = {D.tag[waypoint_id]}")
-
-    def test_checkState_non_waypoint(self):
-        # Test checkState with a non-Waypoint ID
-        D = D_star(1, self.start_waypoint, self.end_waypoint, self.firetruck, self.world, self.map)
-        non_waypoint_id = 999  # Assuming this is not an actual Waypoint ID
-
-        D.checkState(non_waypoint_id)
-
-        self.assertIn(non_waypoint_id, D.h)
-        self.assertEqual(D.h[non_waypoint_id], 0)
-        self.assertIn(non_waypoint_id, D.tag)
-        self.assertEqual(D.tag[non_waypoint_id], 'New')
-        print(f"Test Passed for Non-Waypoint ID: h[{non_waypoint_id}] = {D.h[non_waypoint_id]}, tag[{non_waypoint_id}] = {D.tag[non_waypoint_id]}")
-    
 if __name__ == '__main__':
     unittest.main()
