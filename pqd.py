@@ -43,7 +43,6 @@ class D_star(object):
     # keys are used which causes waypoints to be compared instead in the tuple->not 
     # allowed in priority queue calculations thus error occurs
     def populate_open(self):
-        #temp sol: recalcuate child waypoints when the same waypoints are used again
         if self.next_waypoint:
             child_waypoints = [self.next_waypoint]
             self.next_waypoint = None
@@ -60,9 +59,11 @@ class D_star(object):
             print(f"Processing child waypoint: {child.transform.location}")
 
             key = self.cost(self.state_space, child)
+            #heuristic_cost = self.store_h(child)
+            #total_cost = key + heuristic_cost
             print(f"Cost: {key}")
 
-            existing_items = [item for item in self.OPEN.queue if item[0] == key]
+            existing_items = [item for item in self.OPEN.queue if abs(item[0] - key) < 1e-6]
 
             if not existing_items:
                 self.OPEN.put((key, child))
@@ -84,20 +85,17 @@ class D_star(object):
     
    # Checks if a 'y' state has both heuristic and tag dicts
     def checkState(self, y):
-        if isinstance(y, carla.Waypoint):
-            waypoint_id = y.id
-        else:
-            waypoint_id = y
-
-        if waypoint_id not in self.h:
+        if y.id not in self.h:
             heuristic = self.store_h(y)
-            self.h[waypoint_id] = heuristic 
+            self.h[y.id] = heuristic 
             #self.h[waypoint_id] = 0
-            print(f'Heuristic for state {waypoint_id} with {self.h[waypoint_id]}')
+            print(f'Heuristic for state {y}: {self.h[y.id]}')
+        else:
+            print(f'Heuristic for state {y}: {self.h[y.id]}')
 
-        if waypoint_id not in self.tag:
-            self.tag[waypoint_id] = 'New'
-            print(f'Tag for state {waypoint_id} with {self.tag[waypoint_id]}')
+        if y.id not in self.tag:
+            self.tag[y.id] = 'New'
+            print(f'Tag for state {y}: {self.tag[y.id]}')
     
     def get_kmin(self):
         if self.OPEN:
@@ -118,35 +116,39 @@ class D_star(object):
     
     #make sure tags are updated correctly 
     def insert(self, h_new, state):
-        heuristic = self.store_h(state)
-
-        if state.id not in self.tag:
-            self.tag[state.id] = 'New'
+        print(f"h_new: {h_new}")
+        self.checkState(state)
     
-        new_tag = self.tag[state.id]
+        state_tag = self.tag[state.id]
+        print(f'state_tag: {state_tag}')
         kmin = self.get_kmin()
     
-        if new_tag == 'New':
+        if state_tag == 'New':
             kx = h_new
-        elif new_tag == 'Open':
+            print(f"kx: {kx}")
+        elif state_tag == 'Open':
             kx = min(kmin, h_new)
-        elif new_tag == 'Closed':
-            kx = min(heuristic, h_new)
-            #self.tag[waypoint_id] = 'Open'
-            self.V.add(state)
+            print(f"kx: {kx}")
+        elif state_tag == 'Closed':
+            kx = min(self.h[state.id], h_new)
+            print(f"kx: {kx}")
 
-        self.OPEN.put((kx, state))
-        self.h[state.id] = h_new
+        self.V.add(state)
+        print(f"V: {self.V}")
+
+        self.OPEN.put((kx, state)) 
         self.tag[state.id] = 'Open'
-
         print(f'Inserted state {state} with key {kx}')
-
+    
     def store_h(self, state):
         if state is None:
             return float('inf')
     
         if state.id not in self.h:
             heuristic = state.transform.location.distance(self.xt.transform.location)
+            print(f"State: Location({self.state.transform.location.x}, {self.state.transform.location.y}, {self.state.transform.location.z})")
+            print(f"Self.xt: Location({self.xt.transform.location.x}, {self.xt.transform.location.y}, {self.xt.transform.location.z})")
+            print(f"store_h, heuristic: {heuristic}")
             self.h[state.id] = heuristic
     
         return self.h[state.id]

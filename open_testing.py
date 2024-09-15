@@ -110,16 +110,18 @@ class D_star(object):
             heuristic = self.store_h(y)
             self.h[y.id] = heuristic 
             #self.h[waypoint_id] = 0
-            print(f'Heuristic for state {y.id}: {self.h[y.id]}')
+            print(f'Heuristic for state {y}: {self.h[y.id]}')
+        else:
+            print(f'Heuristic for state {y}: {self.h[y.id]}')
 
         if y.id not in self.tag:
             self.tag[y.id] = 'New'
-            print(f'Tag for state {y.id}: {self.tag[y.id]}')
+            print(f'Tag for state {y}: {self.tag[y.id]}')
     
     def get_kmin(self):
         if self.OPEN:
             self.populate_open()
-            print(f"OPEN: {self.OPEN.empty()}")
+            #print(f"OPEN: {self.OPEN.empty()}")
             minimum = self.OPEN.get() # Return the tuple with the minimum key value
             print(f'get_kmin: minimum: {minimum[0]}')
             return minimum[0]
@@ -135,24 +137,28 @@ class D_star(object):
     
     #make sure tags are updated correctly 
     def insert(self, h_new, state):
+        print(f"h_new: {h_new}")
         self.checkState(state)
     
         state_tag = self.tag[state.id]
+        print(f'state_tag: {state_tag}')
         kmin = self.get_kmin()
     
         if state_tag == 'New':
             kx = h_new
+            print(f"kx: {kx}")
         elif state_tag == 'Open':
             kx = min(kmin, h_new)
+            print(f"kx: {kx}")
         elif state_tag == 'Closed':
             kx = min(self.h[state.id], h_new)
-            self.V.add(state)
+            print(f"kx: {kx}")
+
+        self.V.add(state)
+        print(f"V: {self.V}")
 
         self.OPEN.put((kx, state)) 
-        if self.h[state.id] != h_new:
-            self.h[state.id] = h_new
         self.tag[state.id] = 'Open'
-
         print(f'Inserted state {state} with key {kx}')
 
     
@@ -216,16 +222,10 @@ if __name__ == '__main__':
         point_b = random.choice(spawn_points)
 
     start_waypoint = carla_map.get_waypoint(point_a.location)
-    if start_waypoint is None:
-        print("Start waypoint could not be found.")
-    else:
-        print(f"Start waypoint: {start_waypoint}")
+    print(f"Start waypoint: {start_waypoint}")
 
     end_waypoint = carla_map.get_waypoint(point_b.location)
-    if end_waypoint is None:
-        print("End waypoint could not be found.")
-    else:
-        print(f"End waypoint: {end_waypoint}")
+    print(f"End waypoint: {end_waypoint}")
 
     d_star = D_star(waypoint=start_waypoint, 
                 start_waypoint=start_waypoint, 
@@ -257,7 +257,6 @@ if __name__ == '__main__':
         if min_state in d_star.V:
             d_star.V.remove(min_state)
 
-  
     if min_state.transform.location.distance(end_waypoint.transform.location) < d_star.resolution:
         for waypoint in d_star.waypoints:
             firetruck.set_transform(waypoint.transform)
