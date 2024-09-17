@@ -50,6 +50,7 @@ class D_star(object):
             child_waypoints = self.children(self.state_space)
 
         print(f"Total child waypoints found: {len(child_waypoints)}")
+        #call funciton here that takes into consideration obstalce avoidance
     
         for child in child_waypoints:
             if child in self.V:
@@ -59,14 +60,18 @@ class D_star(object):
             print(f"Processing child waypoint: {child.transform.location}")
 
             key = self.cost(self.state_space, child)
-            #heuristic_cost = self.store_h(child)
+            heuristic_cost = self.store_h(child)
             #total_cost = key + heuristic_cost
-            print(f"Cost: {key}")
 
+            min_distance = heuristic_cost - key
+            print(f"min_distance: {min_distance}")
+
+            #when items that are correclty getting accessed we don't need to check for existing items
+            #temp fix 
             existing_items = [item for item in self.OPEN.queue if abs(item[0] - key) < 1e-6]
 
             if not existing_items:
-                self.OPEN.put((key, child))
+                self.OPEN.put((min_distance, child))
                 print(f"OPEN: {child} key: {key}")
                 self.V.add(child)
             else:
@@ -79,14 +84,60 @@ class D_star(object):
                 else:
                     print("No next waypoint")
     
+        #OPEN should always have max 5 points
         print(f"OPEN queue size: {self.OPEN.qsize()}")
     
         return self.OPEN
+
+    def delete(self, state):
+        self.OPEN.remove(state)
+        self.tag[state.id] = "Closed"
+
+    def detect_obstacles(self, state_space):
+        """
+
+            create recursion here where when an obstacle is detected, it recalculates children from the new current vehicle space  
+            after a move has already been taken 
+
+        """
+        child_waypoints = self.children(state_space)
+        for child in child_waypoints:
+            child_location = child.transform.location
+            for actor in world.get_actors():
+                if actor.id != self.vehicle.id: 
+                    actor_location = actor.get_location()
+                    if actor_location.distance(child_location) < 5.0:
+                        obstacle_found = True
+                        break
+
+        return obstacle_found
     
-    def cost(self, wp1, wp2):
-        distance = wp1.transform.location.distance(wp2.transform.location)
+    def handle_obstacles(self):
+        """
+        Detect obstacles and handle states.
+        If obstacles are detected, recalculates children and updates the state space.
+        """
+        if self.detect_obstacles():
+            print("Obstacle detected.")
+        
+            child_waypoints = self.children(self.state_space)
+            for child in child_waypoints:
+                self.delete(child)
+
+            if not self.OPEN.empty():
+                self.populate_open()
+                kold, x = self.min_state()
+                self.state_space = x
+                next_waypoints = self.children(self.state_space)
+                print(f"Next waypoints recalculated: {[wp.transform.location for wp in next_waypoints]}")
+            
+            else:
+                print("No obstacles detected")
+    
+    def cost(self, state, wp2):
+        distance = state.transform.location.distance(wp2.transform.location)
         print(f"Calculating distance between:")
-        print(f"  Waypoint 1: Location({wp1.transform.location.x}, {wp1.transform.location.y}, {wp1.transform.location.z})")
+        print(f"  Waypoint 1: Location({state.transform.location.x}, {state.transform.location.y}, {state.transform.location.z})")
         print(f"  Waypoint 2: Location({wp2.transform.location.x}, {wp2.transform.location.y}, {wp2.transform.location.z})")
         print(f"  Distance: {distance}")
         return distance
@@ -104,6 +155,7 @@ class D_star(object):
     
         return self.h[state.id]
     
+    """
     # Checks if a 'y' state has both heuristic and tag dicts
     def checkState(self, y):
         if y.id not in self.h:
@@ -117,7 +169,7 @@ class D_star(object):
         if y.id not in self.tag:
             self.tag[y.id] = 'New'
             print(f'Tag for state {y}: {self.tag[y.id]}')
-    
+    """
     def get_kmin(self):
         if self.OPEN:
             self.populate_open()
@@ -134,11 +186,11 @@ class D_star(object):
             print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
             return minimum[0], minimum[1] #returns state k with associated key value
         return None, -1
-    
+    """
     #make sure tags are updated correctly 
     def insert(self, h_new, state):
         print(f"h_new: {h_new}")
-        self.checkState(state)
+        #self.checkState(state)
     
         state_tag = self.tag[state.id]
         print(f'state_tag: {state_tag}')
@@ -160,6 +212,7 @@ class D_star(object):
         self.OPEN.put((kx, state)) 
         self.tag[state.id] = 'Open'
         print(f'Inserted state {state} with key {kx}')
+    """
 
     
     def children(self, state):
@@ -188,6 +241,9 @@ class D_star(object):
                 #if left_wp in self.waypoints:
                     children.append(left_wp)
                     print(f"Left waypoint: {left_wp.transform.location if left_wp else 'None'}")
+                    diag_left_wp = left_wp.next(2.0)
+                    if diag_left_wp:
+                        children.extend(diag_left_wp)
 
         if state.lane_change & carla.LaneChange.Right:
             right_wp = state.get_right_lane()
@@ -196,8 +252,13 @@ class D_star(object):
                 #if right_state in self.waypoints:
                     children.append(right_wp)
                     print(f"Right waypoint: {right_wp.transform.location if right_wp else 'None'}")
+                    diag_right_wp = right_wp.next(2.0)
+                    if diag_right_wp:
+                        children.extend(diag_right_wp)
 
         return children
+    
+
 
 if __name__ == '__main__':
     client = carla.Client('localhost', 2000)
@@ -236,8 +297,6 @@ if __name__ == '__main__':
 
     d_star.state_space = start_waypoint
 
-    d_star.insert(d_star.store_h(start_waypoint), start_waypoint)
-
     for waypoint in d_star.waypoints:
         d_star.state_space = waypoint
 
@@ -252,7 +311,7 @@ if __name__ == '__main__':
             cost = d_star.cost(min_state, child)
             print(f"Cost from {min_state.transform.location} to {child.transform.location}: {cost}")
 
-            d_star.insert(cost, child)
+            #d_star.insert(cost, child)
 
         if min_state in d_star.V:
             d_star.V.remove(min_state)
