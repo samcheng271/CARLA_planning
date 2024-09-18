@@ -86,9 +86,9 @@ class D_star(object):
    # Checks if a 'y' state has both heuristic and tag dicts
     def checkState(self, y):
         if y.id not in self.h:
-            heuristic = self.store_h(y)
-            self.h[y.id] = heuristic 
-            #self.h[waypoint_id] = 0
+            #heuristic = self.store_h(y)
+            #self.h[y.id] = heuristic 
+            self.h[waypoint_id] = 0
             print(f'Heuristic for state {y}: {self.h[y.id]}')
         else:
             print(f'Heuristic for state {y}: {self.h[y.id]}')
@@ -133,11 +133,8 @@ class D_star(object):
             kx = min(self.h[state.id], h_new)
             print(f"kx: {kx}")
 
-        self.V.add(state)
-        print(f"V: {self.V}")
-
-        self.OPEN.put((kx, state)) 
         self.tag[state.id] = 'Open'
+        self.OPEN.put((kx, state)) 
         print(f'Inserted state {state} with key {kx}')
     
     def store_h(self, state):
@@ -166,8 +163,8 @@ class D_star(object):
             print("goal reached")
             #return -1
         
-        self.store_h(x)
-        self.checkState(x)
+        #self.store_h(x)
+        #self.checkState(x)
         #print(f'Checked state: {x}')
         print(f'x: {x}, kold: {kold}')
         print(f'h: {self.h}') #len of self.h = 0
@@ -244,9 +241,6 @@ class D_star(object):
                         #print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
                         self.insert(self.h[y.id], y)
             print("No min")
-
-            if self.tag.get(x.id, 'New') == 'Closed' and x == self.xt and x in self.V:
-                print(f'reached destination, create logic here')
         return self.get_kmin()
 
     #modify_cost/modify are both logically correct acc to D*, but parent/pred 
@@ -283,6 +277,10 @@ class D_star(object):
         print(f"  Waypoint 2: Location({wp2.transform.location.x}, {wp2.transform.location.y}, {wp2.transform.location.z})")
         print(f"  Distance: {distance}")
         return distance
+    
+    def delete(self, state):
+        self.OPEN.remove(state)
+        self.tag[state.id] = "CLOSED"
 
     def children(self, state):
         children = []
@@ -318,7 +316,36 @@ class D_star(object):
 
         return children
 
+    def detect_obstacles(self, state_space):
+        child_waypoints = self.children(state_space)
+        for child in child_waypoints:
+            child_location = child.transform.location
+            for actor in world.get_actors():
+                if actor.id != self.vehicle.id: 
+                    actor_location = actor.get_location()
+                    if actor_location.distance(child_location) < 5.0:
+                        obstacle_found = True
+                        break
+
+        return obstacle_found
     
+    def handle_obstacles(self):
+        """
+        Detect obstacles and handle states accordingly.
+        If obstacles are detected, recalculates children and updates the state space.
+        """
+        if self.detect_obstacles():
+            print("Obstacle detected.")
+        
+            if not self.OPEN.empty():
+                self.populate_open()
+                kold, x = self.min_state()
+                self.state_space = x
+                next_waypoints = self.children(self.state_space)
+                print(f"Next waypoints recalculated: {[wp.transform.location for wp in next_waypoints]}")
+            
+            else:
+                print("No obstacles detected")
     def path(self):
         goal = self.xt
         path = []
