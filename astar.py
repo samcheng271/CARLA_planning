@@ -53,7 +53,7 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
         current_node = open_set.get()[2]
         
         # Early exit if we have reached near the goal
-        if current_node.waypoint.transform.location.distance(end_waypoint.transform.location) < 10.0:
+        if current_node.waypoint.transform.location.distance(end_waypoint.transform.location) < 2.0:
             path = []
 
             while current_node:
