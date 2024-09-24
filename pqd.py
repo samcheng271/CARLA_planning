@@ -88,7 +88,7 @@ class D_star(object):
         if y.id not in self.h:
             #heuristic = self.store_h(y)
             #self.h[y.id] = heuristic 
-            self.h[waypoint_id] = 0
+            self.h[y.id] = 0
             print(f'Heuristic for state {y}: {self.h[y.id]}')
         else:
             print(f'Heuristic for state {y}: {self.h[y.id]}')
@@ -140,16 +140,18 @@ class D_star(object):
     def store_h(self, state):
         if state is None:
             return float('inf')
-    
+
         if state.id not in self.h:
+            """
             heuristic = state.transform.location.distance(self.xt.transform.location)
             print(f"State: Location({self.state.transform.location.x}, {self.state.transform.location.y}, {self.state.transform.location.z})")
             print(f"Self.xt: Location({self.xt.transform.location.x}, {self.xt.transform.location.y}, {self.xt.transform.location.z})")
             print(f"store_h, heuristic: {heuristic}")
+            """
+            heuristic = 0
             self.h[state.id] = heuristic
-    
+            print(f"store_h, heuristic: {heuristic}")
         return self.h[state.id]
-
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
@@ -257,7 +259,7 @@ class D_star(object):
             print(f"cost(state_space, xparent): {self.cost(state_space, xparent)}")
             self.insert(cost_value, state_space)
 
-
+    #repair_replan
     def modify(self, state_space):
         #print(f'modify: state_space: {state_space}')
         self.modify_cost(state_space)
@@ -337,15 +339,26 @@ class D_star(object):
         if self.detect_obstacles():
             print("Obstacle detected.")
         
+            child_waypoints = self.children(self.state_space)
+            for child in child_waypoints:
+                self.delete(child)
+                self.modify(child)  # odify for deleted child
+            
             if not self.OPEN.empty():
                 self.populate_open()
                 kold, x = self.min_state()
                 self.state_space = x
                 next_waypoints = self.children(self.state_space)
+                
+                for waypoint in next_waypoints:
+                    self.modify_cost(waypoint)  # Modify_cost for new waypoints
+                
                 print(f"Next waypoints recalculated: {[wp.transform.location for wp in next_waypoints]}")
             
-            else:
-                print("No obstacles detected")
+        else:
+            print("No obstacles detected")
+
+    #backpointer list 
     def path(self):
         goal = self.xt
         path = []
@@ -378,6 +391,10 @@ class D_star(object):
 
         while self.tag.get(self.state_space.id, 'New') != "Closed":
             self.process_state()
+            if not self.OPEN.empty():
+                _, new_state_space = self.OPEN.get()
+                self.state_space = new_state_space
+                print(f"Updated state_space to: {self.state_space.transform.location}")
 
             #if loop causing a key error because: 1. ss_id is not in self.h(incorrectly accessed or not initalized in self.h)
             if self.tag[self.state_space.id] == 'Closed':
