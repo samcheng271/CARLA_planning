@@ -47,16 +47,12 @@ class GlobalRoutePlanner(object):
         route_trace = []
         route = self._path_search(origin, destination)
 
-        origin = origin.transform.location
-        destination = destination.transform.location
-
         current_waypoint = self._wmap.get_waypoint(origin)
         destination_waypoint = self._wmap.get_waypoint(destination)
 
         for i in range(len(route) - 1):
             road_option = self._turn_decision(i, route)
             edge = self._graph.edges[route[i], route[i+1]]
-            print(edge)
             path = []
 
             if edge['type'] != RoadOption.LANEFOLLOW and edge['type'] != RoadOption.VOID:
@@ -302,12 +298,12 @@ class GlobalRoutePlanner(object):
         connecting origin and destination
         """
 
-        origin_location = origin.transform.location
-        destination_location = destination.transform.location
+        origin_waypoint = self._wmap.get_waypoint(origin)
+        destination_waypoint = self._wmap.get_waypoint(destination)
 
-        start, end = self._localize(origin_location), self._localize(destination_location)
+        start, end = self._localize(origin), self._localize(destination)
 
-        route = a_star(origin, destination)
+        route = a_star(origin_waypoint, destination_waypoint)
 
         localized_route = [self._localize(waypoint.transform.location) for waypoint in route]
 
