@@ -1,11 +1,12 @@
+import heapq
 import carla
 import numpy as np
 import random
+from collections import defaultdict
 from queue import PriorityQueue
 
-#consider move-robot-how does move-robot compare to move_vehicle 
-class D_star(object):
-    #def __init__(self, waypoint, start_location, goal_location, vehicle, world, map, resolution=2.0):
+
+class DStar:
     def __init__(self, waypoint, start_waypoint, end_waypoint, vehicle, world, map, resolution=2.0):
         self.settings = 'CollisionChecking'
         self.resolution = resolution
@@ -15,37 +16,32 @@ class D_star(object):
         self.OPEN = PriorityQueue()
         
         self.tag = {}
-        self.V = set()
-        self.parameters = ()
-        self.ind = 0
+        self.V = set()  # Set of processed states
         self.Path = []
         self.done = False
         self.Obstaclemap = {}
         self.world = world
         self.map = map
         self.vehicle = vehicle
-        self.state = self.waypoint
-        self.location = self.vehicle.get_location()
-        self.state_space = self.map.get_waypoint(self.location, project_to_road=True)
+        self.state_space = self.map.get_waypoint(vehicle.get_location(), project_to_road=True)
         self.waypoints = self.map.generate_waypoints(self.resolution)
         print(f"Number of waypoints generated: {len(self.waypoints)}")
         self.h = {}
-        self.next_waypoint = None
-        self.x0 = start_waypoint
-        print(f'start_waypoint: {self.x0.transform.location}')
-        #self.state_space = self.x0 
-        self.xt = end_waypoint
-        print(f'end_waypoint: {self.xt.transform.location}')
-        
-    #this function is good 
+        self.x0 = start_waypoint  # Start waypoint
+        self.xt = end_waypoint  # Goal waypoint
+        print(f'Start waypoint: {self.x0.transform.location}')
+        print(f'End waypoint: {self.xt.transform.location}')
+    
+
     def populate_open(self):
-        """
-        if self.next_waypoint:
-            child_waypoints = [self.next_waypoint]
-            self.next_waypoint = None
-        else:
-            child_waypoints = self.children(self.state_space)
-        """
+        
+        #if self.next_waypoint:
+            #child_waypoints = [self.next_waypoint]
+            #self.next_waypoint = None
+        #else:
+            #child_waypoints = self.children(self.state_space)
+        
+        
         child_waypoints = self.children(self.state_space)
         print(f"Total child waypoints found: {len(child_waypoints)}")
         #call funciton here that takes into consideration obstalce avoidance
@@ -76,16 +72,28 @@ class D_star(object):
                     print(f"Next waypoint: {self.next_waypoint.transform.location}")
                 else:
                     print("No next waypoint")
-    
+
         #OPEN should always have max 5 points
         print(f"OPEN queue size: {self.OPEN.qsize()}")
     
         return self.OPEN
-    """
+    '''
     def delete(self, state):
-        self.OPEN.remove(state)
+        self.OPEN.pop(state)
         self.tag[state.id] = "Closed"
-    """
+    '''
+    def checkState(self, y):
+        if y.id not in self.h:
+            #heuristic = self.store_h(y)
+            #self.h[y.id] = heuristic 
+            self.h[y.id] = 0
+            print(f'Heuristic for state {y}: {self.h[y.id]}')
+        else:
+            print(f'Heuristic for state {y}: {self.h[y.id]}')
+
+        if y.id not in self.tag:
+            self.tag[y.id] = 'New'
+            print(f'Tag for state {y}: {self.tag[y.id]}')
 
     def cost(self, wp1, wp2):
         distance = wp1.transform.location.distance(wp2.transform.location)
@@ -99,7 +107,7 @@ class D_star(object):
     
     def get_kmin(self):
         if self.OPEN:
-            self.populate_open()
+            #self.populate_open()
             print(f"OPEN: {self.OPEN.empty()}")
             minimum = self.OPEN.get() # Return the tuple with the minimum key value
             print(f'get_kmin: minimum: {minimum[0]}')
@@ -108,7 +116,7 @@ class D_star(object):
     def min_state(self):
         if self.OPEN:
             print("min_state")
-            self.populate_open()
+            #self.populate_open()
             minimum = self.OPEN.get()
             print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
             return minimum[0], minimum[1] #returns state k with associated key value
@@ -133,27 +141,10 @@ class D_star(object):
             kx = min(self.h[state.id], h_new)
             print(f"kx: {kx}")
 
+        self.h[state.id] = h_new
         self.tag[state.id] = 'Open'
         self.OPEN.put((kx, state)) 
         print(f'Inserted state {state} with key {kx}')
-    
-    def store_h(self, state):
-        if state is None:
-            return float('inf')
-
-        if state.id not in self.h:
-            
-            heuristic = state.transform.location.distance(self.xt.transform.location)
-            print(f"State: Location({self.state.transform.location.x}, {self.state.transform.location.y}, {self.state.transform.location.z})")
-            print(f"Self.xt: Location({self.xt.transform.location.x}, {self.xt.transform.location.y}, {self.xt.transform.location.z})")
-            print(f"store_h, heuristic: {heuristic}")
-            """
-            heuristic = 0
-            self.h[state.id] = heuristic
-            print(f"store_h, heuristic: {heuristic}")
-            """
-            self.h[state.id] = heuristic
-        return self.h[state.id]
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
@@ -167,15 +158,18 @@ class D_star(object):
             print("goal reached")
             #return -1
         
-        self.store_h(x)
+        #self.delete(x)
+
+        #self.store_h(x)
         #self.checkState(x)
         #print(f'Checked state: {x}')
         print(f'x: {x}, kold: {kold}')
-        #print(f'h: {self.h}') #len of self.h = 0
+        print(f'h: {self.h}') #len of self.h = 0
         print(f'b: {self.b}')
         if x not in self.V:
+            """
             for y in self.children(x):
-                #self.checkState(y)  
+                self.checkState(y)  
                 print(f'Processing child y: {y}')
                 print(f'x.id: {x.id}, self.h[x.id]: {self.h[x.id]}')
                 print(f'Cost(x, y): {self.cost(x, y)}')
@@ -192,12 +186,12 @@ class D_star(object):
                     self.h[y.id] = h_new
                     self.b[y.id] = x
                     self.insert(h_new, y)
-
+            """
             if kold < self.h[x.id]:  # raised states
                 print(f'kold < h[x.id]: {kold} < {self.h[x.id]}')
                 for y in self.children(x):
                     #print(f'child: {y}')
-                    #self.checkState(y)
+                    self.checkState(y)
                     print("3")
                     heuristic_a = self.h[y.id] + self.cost(y, x)
                     print(f'heuristic_a: {heuristic_a}')
@@ -208,12 +202,12 @@ class D_star(object):
 
             if kold == self.h[x.id]:  # lower states 
                 print(f'kold == h[x.id]: {kold} == {self.h[x.id]}')
-                self.tag[x.id] = 'Closed'
-                self.V.add(x)
+                #self.tag[x.id] = 'Closed'
+                #self.V.add(x)
                 for y in self.children(x):
                     # check y
                     #print(f'child: {y}')
-                    #self.checkState(y)
+                    self.checkState(y)
                     print("4")
                     bb = self.h[x.id] + self.cost(x, y)
                     #print(f"process state: cost(x, y) = {self.cost(x, y)}")
@@ -229,7 +223,7 @@ class D_star(object):
                 print(f'kold != h[x.id]: {kold} != {self.h[x.id]}')
                 for y in self.children(x):
                     # check y
-                    #self.checkState(y)
+                    self.checkState(y)
                     print("5")
                     bb = self.h[x.id] + self.cost(x, y)
                     print(f'bb: {bb}')
@@ -237,15 +231,18 @@ class D_star(object):
                             (self.b[y.id] == x and self.h[y.id] != bb):
                         self.b[y.id] = x
                         self.insert(bb, y)
-                    elif self.b[y.id] != x and self.h[y.id] > bb:
-                        #print(f'insert x: {x} with h[x]: {self.h[x.id]}')
-                        self.insert(self.h[x.id], x)
-                    elif self.b[y.id] != x and self.h[y.id] > bb and \
-                        self.tag[y.id] == 'Closed' and self.h[y.id] == kold:
-                        #print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
-                        self.insert(self.h[y.id], y)
+                    else: 
+                        if(self.b[y.id] != x and self.h[y.id] > bb):
+                            #print(f'insert x: {x} with h[x]: {self.h[x.id]}')
+                            self.insert(self.h[x.id], x)
+                        else:
+                            if(self.b[y.id] != x and self.h[y.id] > bb and \
+                            self.tag[y.id] == 'Closed' and self.h[y.id] == kold):
+                            #print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
+                                self.insert(self.h[y.id], y)
             print("No min")
         return self.get_kmin()
+    
 
     def children(self, state):
         children = []
@@ -291,26 +288,30 @@ class D_star(object):
 
         return children  
 
+
 if __name__ == '__main__':
+    # Connect to the CARLA server
     client = carla.Client('localhost', 2000)
     client.set_timeout(10.0)
-    # world = client.load_world('Town05') # Use this to switch towns
+
     # Get the world and map
     world = client.get_world()
     carla_map = world.get_map()
 
-    # Spawn a firetruck at a random location (point A)
+    # Spawns a firetruck at a random starting location (point A)
     blueprint_library = world.get_blueprint_library()
     firetruck_bp = blueprint_library.filter('vehicle.carlamotors.firetruck')[0]
     spawn_points = carla_map.get_spawn_points()
 
-
-    # Choose a random starting location (point A)
+    # Random starting location (point A)
     point_a = random.choice(spawn_points)
-    firetruck = world.spawn_actor(firetruck_bp, point_a)
-    # Choose a random destination (point B)
+    firetruck = world.try_spawn_actor(firetruck_bp, point_a)
+    if not firetruck:
+        raise RuntimeError("Failed to spawn the vehicle.")
+
+    # Random destination (point B)
     point_b = random.choice(spawn_points)
-    if point_b.location == point_a.location:
+    while point_b.location == point_a.location:
         point_b = random.choice(spawn_points)
 
     start_waypoint = carla_map.get_waypoint(point_a.location)
@@ -319,43 +320,14 @@ if __name__ == '__main__':
     end_waypoint = carla_map.get_waypoint(point_b.location)
     print(f"End waypoint: {end_waypoint}")
 
-    d_star = D_star(waypoint=start_waypoint, 
-                start_waypoint=start_waypoint, 
-                end_waypoint=end_waypoint, 
-                vehicle=firetruck, 
-                world=world, 
-                map=carla_map)
- 
-    for waypoint in d_star.waypoints:
-        d_star.state_space = waypoint
-        result = d_star.process_state()
-        print(f"result: {result}")
-        
-        if not d_star.OPEN.empty():
-            _, update_state = d_star.min_state()
-            d_star.state_space = update_state
-            print(f"Updated state_space: {d_star.state_space.transform.location}")
+    d_star = DStar(waypoint=start_waypoint, 
+                    start_waypoint=start_waypoint, 
+                    end_waypoint=end_waypoint, 
+                    vehicle=firetruck, 
+                    world=world, 
+                    map=carla_map)
 
-        if result == -1:
-            print(f"Goal reached or path not found at waypoint {waypoint.transform.location}")
-            break
+    d_star.populate_open()
 
-        d_star.populate_open()
-        child_waypoints = d_star.children(d_star.state_space)
-        for child in child_waypoints:
-            cost = d_star.cost(d_star.state_space, child)
-            print(f"Cost from {d_star.state_space.transform.location} to {child.transform.location}: {cost}")
-        
-        if d_star.state_space in d_star.V:
-            d_star.V.remove(d_star.state_space)
-        
-        if d_star.state_space.transform.location == (d_star.xt.transform.location):
-            print("Goal reached!")
-            break
-        
-
-        print(f"Current state: {d_star.state_space.transform.location}")
-        print(f"Open queue size: {d_star.OPEN.qsize()}")
-        print(f"Closed set size: {len(d_star.V)}")
-    
-    firetruck.destroy()
+    while not d_star.OPEN.empty():
+        d_star.process_state()
