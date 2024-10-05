@@ -75,13 +75,21 @@ class PriorityQueue:
         """Pop the smallest item off the heap, maintaining the heap invariant."""
         lastelt = self.heap.pop()  # raises appropriate IndexError if heap is empty
         # print(f'lastelt {lastelt.vertex}')
-        self.vertices_in_heap.remove(lastelt.vertex)
+        # self.vertices_in_heap.remove(lastelt.vertex)
+        # if self.heap:
+        #     returnitem = self.heap[0]
+        #     self.heap[0] = lastelt.vertex
+        #     self._siftup(0)
+        # else:
+        #     returnitem = lastelt.vertex
+        self.vertices_in_heap.remove(lastelt)
         if self.heap:
             returnitem = self.heap[0]
-            self.heap[0] = lastelt.vertex
+            self.heap[0] = lastelt
             self._siftup(0)
         else:
-            returnitem = lastelt.vertex
+            returnitem = lastelt
+        # Reminder: this isn't being used anymore. so no need to think about it. use remove instead.
         return returnitem
 
     def insert(self, vertex, priority):
