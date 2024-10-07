@@ -226,26 +226,6 @@ class DStarLite:
                 # for i in range(len(self.all_waypoints)-3):
                 #     self.world.debug.draw_string(self.all_waypoints[i].transform.location, f'{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
 
-                    
-                # z = self.all_waypoints[5]
-                # self.world.debug.draw_string(z.transform.location, 'Z', draw_shadow=False, color=carla.Color(r=0, g=0, b=220), life_time=30.0, persistent_lines=True)
-                # if current waypoint +/- 5 is not nearby then:
-                # what if i use self.predecessors, then for each waypoint in pred,
-                # i check what waypoints are close by to them in self.all_waypoints
-                # also check if they are a legal lane change to avoid getting waypoints on opposite lane
-                # use dictionary to store and lookup
-
-                # pz=self.predecessors(z)
-                # for i in pz:
-                #     self.world.debug.draw_string(i.transform.location, 'P', draw_shadow=False, color=carla.Color(r=0, g=0, b=220), life_time=30.0, persistent_lines=True)
-
-                #     print(f'pz {i}')
-                #     # print(f'pz {self.g.get(i.id)}')
-
-                # print(f'p1: {self.all_waypoints[1]}')
-                # print(f'p4: {self.all_waypoints[4]}')
-
-                # print(f'pred:: {pred[0]}')
                 for s in pred:
                     # print(f's:: {s}')
                     # self.world.debug.draw_string(s.transform.location, 'x', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
@@ -253,22 +233,24 @@ class DStarLite:
                     # print(f'self.heuristic_c(s, u) {self.heuristic_c(s, u)}')
                     # print(f'self.g_old {self.g_old}')              
                     # print(f'self.rhs[s.id] {self.rhs[s.id]}')      
-                    if self.rhs[s.id] == (self.heuristic_c(s, u) + self.g_old):
+                    if self.rhs[s.id] == self.heuristic_c(s, u) + self.g_old:
                         if s != self.goal:#?????
                             self.rhs[s.id] = (self.heuristic_c(s, u) + self.g_old)
                             min_s = float('inf')
                             # succ = self.sensed_map.successors(vertex=s)
-                            succ = s
+                            succ = self.successors(s)
                             for s_ in succ:
-                                # temp = self.heuristic_c(s, s_) + self.g[s_.id]
-                                # if min_s > temp:
-                                #     min_s = temp
-                                temp = min( self.heuristic_c(s, s_) + self.g[s_.id], min_s)
+                                temp = self.heuristic_c(s, s_) + self.g[s_.id]
+                                if min_s > temp:
+                                    min_s = temp
+                                # temp = min( self.heuristic_c(s, s_) + self.g[s_.id], min_s)
                             self.rhs[s.id] = min_s
                     self.update_vertex(u)
-            print(f'self.U {self.U.vertices_in_heap}')
+            # print(f'self.U {self.U.vertices_in_heap}')
             # print(f'STUFF1:::{self.U.top_key() < self.calculate_key(self.start)}')
             # print(f'STUFF2::: {self.rhs[self.start.id] > self.g[self.start.id]}')
+        for i in self.U.heap:
+            print(f'U: k1={i.priority.k1}||k2={i.priority.k2}||v={i.vertex}')
         for i in self.U.vertices_in_heap:
             self.world.debug.draw_string(i.transform.location, f'!{self.rhs[i.id]}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
             
