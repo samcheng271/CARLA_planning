@@ -59,7 +59,7 @@ class DStarLite:
                 neighbors[i] = x
         return neighbors
     def predecessors(self, waypoint):
-        waypoint=self.all_waypoints[0]
+        
         neighbors = []
         # Pred(the waypoint) is visible
         # self.world.debug.draw_string(waypoint.transform.location, 'pred', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
@@ -86,9 +86,9 @@ class DStarLite:
         # print(f'neighbors {neighbors}')
         # print(f'bef neighbors:: {neighbors[0]}')
         # print(f'bef neighbors:: {neighbors[1]}')
-        self.world.debug.draw_string(neighbors[0].transform.location, 'weutowr', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
+        # self.world.debug.draw_string(neighbors[0].transform.location, 'weutowr', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
 
-        self.world.debug.draw_string(neighbors[1].transform.location, 'yweiytwiuy', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
+        # self.world.debug.draw_string(neighbors[1].transform.location, 'yweiytwiuy', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
 
         # x = self.wp_pos[waypoint.id]
         # print(f'x {x}')
@@ -148,9 +148,12 @@ class DStarLite:
         print(f'self.U {self.U.heap}') # [priorityNode]
         print(f'self.U {self.U.vertices_in_heap}') # [wp]
         print(f'goal calculate_key {self.calculate_key(self.goal).k1}') 
+
+        self.world.debug.draw_string(self.goal.transform.location, 'goal', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
         pred_list = self.predecessors(self.goal)
         for i in range(len(pred_list)):
             self.world.debug.draw_string(pred_list[i].transform.location, f'init:{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
+
         print(f'pred_list {pred_list}')
         print(f'pred 1 {pred_list[0]}')
         # print(f'self.U {self.U.pop()}') # wp
@@ -517,7 +520,7 @@ print(f'gen_points {gen_points[0]}')
 print(f'real_points {real_points[0]}')
 all_waypoints = real_points # + [get_start] +[get_end]
 print(f'all_waypoints {all_waypoints[0]}')
-world.debug.draw_string(all_waypoints[0].transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
+# world.debug.draw_string(all_waypoints[0].transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
 print(f'get_start {get_start}')
 print(f'get_end {get_end}')
 world.debug.draw_string(get_start.transform.location, 'S', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
