@@ -26,6 +26,10 @@ class DStarLite:
         print('init successfully')
         self.new_edges_and_old_costs = None
         
+        # why are end_waypoint and start_waypoint in reverse but self.goal and self.start aren't?
+        # self.world.debug.draw_string(end_waypoint.transform.location, 'EEEEEEEEEE', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
+        # self.world.debug.draw_string(start_waypoint.transform.location, 'SSSSSSSSSS', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
+
     def successors(self,waypoint):
         neighbors = []
         # Forward neighbor
@@ -86,26 +90,6 @@ class DStarLite:
 
         self.world.debug.draw_string(neighbors[1].transform.location, 'yweiytwiuy', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
 
-
-        # x = self.wp_pos[waypoint.id]
-        # # print(f'x {x}')
-        # len_map = len(self.wp_pos)
-        # min_wp = self.all_waypoints[(x-5)%len_map]
-        # for i in range(len(neighbors)):
-        #     if self.g.get(neighbors[i].id) is None:
-        #         print('A None found')
-        #         for j in range(-4,6):
-        #             # x = self.wp_pos[waypoint.id]
-        #             # print(f'x {x}')
-        #             if neighbors[i].transform.location.distance(self.all_waypoints[(x+j)%len_map].transform.location) < neighbors[i].transform.location.distance(min_wp.transform.location):
-        #                 updated_wp = self.all_waypoints[(x+j)%len_map]
-        #                 min_wp = self.all_waypoints[(x+j)%len_map]
-        #         print(f'updated_wp {updated_wp}')
-        #         i = updated_wp
-        #         print(f'i {i}')
-
-
-
         # x = self.wp_pos[waypoint.id]
         # print(f'x {x}')
         for i in range(len(neighbors)):
@@ -139,11 +123,6 @@ class DStarLite:
         return (waypoint.transform.location.x, waypoint.transform.location.y, waypoint.transform.location.z)
 
     def calculate_key(self, s):
-        # print(f's.id {s.id}')
-        # x1 = min(self.g[s.id], self.rhs[s.id])
-        # x2 = self.epsilon * self.heuristic(s, self.start) + self.km
-        # y=min(self.g[s.id], self.rhs[s.id])
-        # return [min(self.g[s.id], self.rhs[s.id]) + self.epsilon * self.heuristic(s, self.start) + self.km,min(self.g[s.id], self.rhs[s.id])]
         return Priority(min(self.g[s.id], self.rhs[s.id]) + self.epsilon * self.heuristic(s, self.start) + self.km,
                         min(self.g[s.id], self.rhs[s.id]))
 
@@ -153,11 +132,6 @@ class DStarLite:
         self.km = 0
         # check = 0
         for s in self.all_waypoints:
-            # current_wp = self.map.get_waypoint(s.transform.location)
-            # if check ==0:
-            #     print(f's  {s}')
-            #     print(f's.id  {s.id}')
-            # check +=1
             self.rhs[s.id] = float('inf')
             self.g[s.id] = float('inf')
         self.g[self.goal.id]=0
@@ -169,39 +143,54 @@ class DStarLite:
         # self.U.insert(self.goal, [self.heuristic(self.start, self.goal), 0])
         self.U.insert(self.goal,  Priority(self.heuristic(self.start, self.goal), 0))
         
-        # print(f'self.goal {self.goal}') # wp
-        print(f'self.U {self.U.top_key()}') # (g, rhs)
-        # print(f'self.U {self.U.top_key()}') # (g, rhs)
+        print(f'self.goal {self.goal}') # wp
+        print(f'self.U {self.U.top_key()}') # Priority(g, rhs)
+        print(f'self.U {self.U.heap}') # [priorityNode]
+        print(f'self.U {self.U.vertices_in_heap}') # [wp]
+        print(f'goal calculate_key {self.calculate_key(self.goal).k1}') 
+        pred_list = self.predecessors(self.goal)
+        for i in range(len(pred_list)):
+            self.world.debug.draw_string(pred_list[i].transform.location, f'init:{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
+        print(f'pred_list {pred_list}')
+        print(f'pred 1 {pred_list[0]}')
         # print(f'self.U {self.U.pop()}') # wp
         # print(f'self.U {self.U.top_key()}') # empty
         # print(f'self.g {self.g}') # {..., wp.id: g, ...}
 
+
+
     def update_vertex(self, u):
+        # if self.g[u.id] != self.rhs[u.id] and not self.contain(u):
+        #     self.U.insert(u, self.calculate_key(u))
+        #     print('2')
+        #     print(f'self.U {self.U.top_key()}') # (g, rhs)
+        # elif self.g[u.id] == self.rhs[u.id] and self.contain(u):
+        #     self.U.remove(u)
+        #     print('3')
+        #     print(f'self.U {self.U.top_key()}') # (g, rhs)
+
+        # elif self.g[u.id] != self.rhs[u.id] and self.contain(u):
+        #     self.U.update(u, self.calculate_key(u))
+        #     print('1')
+        #     print(f'self.U {self.U.top_key()}') # (g, rhs)
+
         if self.g[u.id] != self.rhs[u.id] and self.contain(u):
+            # a shorter path has been found
             self.U.update(u, self.calculate_key(u))
             print('1')
             print(f'self.U {self.U.top_key()}') # (g, rhs)
 
         elif self.g[u.id] != self.rhs[u.id] and not self.contain(u):
+            # if node hasn't been processed to its optimal cost yet
             self.U.insert(u, self.calculate_key(u))
             print('2')
             print(f'self.U {self.U.top_key()}') # (g, rhs)
 
         elif self.g[u.id] == self.rhs[u.id] and self.contain(u):
+            # have already optimized this node but still in the open set(lookup)
             self.U.remove(u)
             print('3')
             print(f'self.U {self.U.top_key()}') # (g, rhs)
-
-    # def prev_check(self, u):
-    #     pred = self.predecessors(u)
-    #     for s in pred:
-    #         self.world.debug.draw_string(s.transform.location, 'U', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=200.0, persistent_lines=True)
-    #         self.prev_check(s)
-    #         if s.waypoint.transform.location.distance(self.goal.transform.location) < 10.0:
-    #             print('REACHED\n')
-    #             break
-
-    #     return None
 
     def compute_shortest_path(self):
         while (self.U.top_key() < self.calculate_key(self.start)) or (self.rhs[self.start.id] > self.g[self.start.id]):
@@ -293,97 +282,98 @@ class DStarLite:
         # self.initialize()
         self.compute_shortest_path()
 
-        while self.s_current != self.goal:
-            # if self.g[self.s_current.id] == float('inf'):
-            if self.rhs[self.s_current.id] != float('inf'):
-                print("There is no known path to the goal.")
-                return
+        # while self.s_current != self.goal:
+        #     # if self.g[self.s_current.id] == float('inf'):
+        #     if self.rhs[self.s_current.id] != float('inf'):
+        #         print("There is no known path to the goal.")
+        #         return
 
-            # Move to the best successor
-            successor = self.successors(self.s_current)
-            if not successor:
-                print("No valid successor found.")
-                return
-            min_s = float('inf')
-            arg_min = None
-            for s_ in successor:
-                temp = self.heuristic_c(self.s_current, s_) + self.g[s_.id]
-                if temp < min_s:
-                    min_s = temp
-                    arg_min = s_
-                # print(f'self.g::{self.g[s_.id]}')
-                # print(f'self.heur::{self.heuristic_c(self.s_current, s_) }')
-            self.s_current = arg_min
-            # self.s_current = min(
-            #     successor,
-            #     key=lambda s: self.heuristic_c(self.s_current, s) + self.g[s.id]
-            # )
-            # print(f"temp: {self.g}")
-            # ===============================================================
-            # print(f"Moving to: {self.s_current.transform.location}")
+        #     # Move to the best successor
+        #     successor = self.successors(self.s_current)
+        #     if not successor:
+        #         print("No valid successor found.")
+        #         return
+        #     min_s = float('inf')
+        #     arg_min = None
+        #     for s_ in successor:
+        #         temp = self.heuristic_c(self.s_current, s_) + self.g[s_.id]
+        #         if temp < min_s:
+        #             min_s = temp
+        #             arg_min = s_
+        #         # print(f'self.g::{self.g[s_.id]}')
+        #         # print(f'self.heur::{self.heuristic_c(self.s_current, s_) }')
+        #     self.s_current = arg_min
+        #     # self.s_current = min(
+        #     #     successor,
+        #     #     key=lambda s: self.heuristic_c(self.s_current, s) + self.g[s.id]
+        #     # )
+        #     # print(f"temp: {self.g}")
 
-            # # Simulate movement (in a real scenario, you'd move the vehicle here)
-            # time.sleep(0.5)  # Simulating movement time
+        #     self.s_start = arg_min
+        #     path.append(self.s_start)
+        #     # scan graph for changed costs
+        #     changed_edges_with_old_cost = self.rescan()
+        #     #print("len path: {}".format(len(path)))
+        #     # if any edge costs changed
+        #     if changed_edges_with_old_cost:
+        #         self.k_m += self.heuristic_c(self.s_last, self.s_start)
+        #         self.s_last = self.s_start
 
-            # # Scan for changes in edge costs
-            # changed_edges = self.scan_for_changes()
+        #         # for all directed edges (u,v) with changed edge costs
+        #         vertices = changed_edges_with_old_cost.vertices
+        #         for vertex in vertices:
+        #             v = vertex.pos
+        #             succ_v = vertex.edges_and_c_old
+        #             for u, c_old in succ_v.items():
+        #                 c_new = self.c(u, v)
+        #                 if c_old > c_new:
+        #                     if u != self.s_goal:
+        #                         self.rhs[u] = min(self.rhs[u], self.c(u, v) + self.g[v])
+        #                 elif self.rhs[u] == c_old + self.g[v]:
+        #                     if u != self.s_goal:
+        #                         min_s = float('inf')
+        #                         succ_u = self.sensed_map.succ(vertex=u)
+        #                         for s_ in succ_u:
+        #                             temp = self.c(u, s_) + self.g[s_]
+        #                             if min_s > temp:
+        #                                 min_s = temp
+        #                         self.rhs[u] = min_s
+        #                     self.update_vertex(u)
+        #     self.compute_shortest_path()
+        #     # ===============================================================
+        #     # print(f"Moving to: {self.s_current.transform.location}")
+
+        #     # # Simulate movement (in a real scenario, you'd move the vehicle here)
+        #     # time.sleep(0.5)  # Simulating movement time
+
+        #     # # Scan for changes in edge costs
+        #     # changed_edges = self.scan_for_changes()
             
-            # if changed_edges:
-            #     self.km += self.heuristic(self.s_last, self.s_current)
-            #     self.s_last = self.s_current
+        #     # if changed_edges:
+        #     #     self.km += self.heuristic(self.s_last, self.s_current)
+        #     #     self.s_last = self.s_current
 
-            #     for u, v in changed_edges:
-            #         c_old = self.heuristic_c(u, v)
-            #         # Update the edge cost (in a real scenario, you'd get the new cost from the environment)
-            #         c_new = random.uniform(0.8 * c_old, 1.2 * c_old)  # Simulating cost change
+        #     #     for u, v in changed_edges:
+        #     #         c_old = self.heuristic_c(u, v)
+        #     #         # Update the edge cost (in a real scenario, you'd get the new cost from the environment)
+        #     #         c_new = random.uniform(0.8 * c_old, 1.2 * c_old)  # Simulating cost change
                     
-            #         if c_old > c_new:
-            #             if u != self.goal:
-            #                 self.rhs[u.id] = min(self.rhs[u.id], c_new + self.g[v.id])
-            #         elif self.rhs[u.id] == c_old + self.g[v.id]:
-            #             if u != self.goal:
-            #                 self.rhs[u.id] = min(
-            #                     self.heuristic_c(u, s) + self.g[s.id]
-            #                     for s in self.successors(u)
-            #                 )
-            #         self.update_vertex(u)
+        #     #         if c_old > c_new:
+        #     #             if u != self.goal:
+        #     #                 self.rhs[u.id] = min(self.rhs[u.id], c_new + self.g[v.id])
+        #     #         elif self.rhs[u.id] == c_old + self.g[v.id]:
+        #     #             if u != self.goal:
+        #     #                 self.rhs[u.id] = min(
+        #     #                     self.heuristic_c(u, s) + self.g[s.id]
+        #     #                     for s in self.successors(u)
+        #     #                 )
+        #     #         self.update_vertex(u)
 
-            #     self.compute_shortest_path()
-        # ===============================================================
-            self.s_start = arg_min
-            path.append(self.s_start)
-            # scan graph for changed costs
-            changed_edges_with_old_cost = self.rescan()
-            #print("len path: {}".format(len(path)))
-            # if any edge costs changed
-            if changed_edges_with_old_cost:
-                self.k_m += self.heuristic_c(self.s_last, self.s_start)
-                self.s_last = self.s_start
-
-                # for all directed edges (u,v) with changed edge costs
-                vertices = changed_edges_with_old_cost.vertices
-                for vertex in vertices:
-                    v = vertex.pos
-                    succ_v = vertex.edges_and_c_old
-                    for u, c_old in succ_v.items():
-                        c_new = self.c(u, v)
-                        if c_old > c_new:
-                            if u != self.s_goal:
-                                self.rhs[u] = min(self.rhs[u], self.c(u, v) + self.g[v])
-                        elif self.rhs[u] == c_old + self.g[v]:
-                            if u != self.s_goal:
-                                min_s = float('inf')
-                                succ_u = self.sensed_map.succ(vertex=u)
-                                for s_ in succ_u:
-                                    temp = self.c(u, s_) + self.g[s_]
-                                    if min_s > temp:
-                                        min_s = temp
-                                self.rhs[u] = min_s
-                            self.update_vertex(u)
-            self.compute_shortest_path()
-        print("path found!")
-        return path, self.g, self.rhs
-        print("Goal reached!")
+        #     #     self.compute_shortest_path()
+        # # ===============================================================
+        # print("path found!")
+        # return path, self.g, self.rhs
+        # print("Goal reached!")
 
     # # def rescan(self) -> Vertices:
 
@@ -515,12 +505,12 @@ for i in gen_points:
 
 curr_min = gen_points[0]
 for i in gen_points:
-    if i.transform.location.distance(end_waypoint.transform.location) < curr_min.transform.location.distance(end_waypoint.transform.location):
+    if i.transform.location.distance(start_waypoint.transform.location) < curr_min.transform.location.distance(start_waypoint.transform.location):
         curr_min = i
 get_start = curr_min
 curr_min = gen_points[0]
 for i in gen_points:
-    if i.transform.location.distance(start_waypoint.transform.location) < curr_min.transform.location.distance(start_waypoint.transform.location):
+    if i.transform.location.distance(end_waypoint.transform.location) < curr_min.transform.location.distance(end_waypoint.transform.location):
         curr_min = i
 get_end = curr_min
 print(f'gen_points {gen_points[0]}')
@@ -530,10 +520,14 @@ print(f'all_waypoints {all_waypoints[0]}')
 world.debug.draw_string(all_waypoints[0].transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
 print(f'get_start {get_start}')
 print(f'get_end {get_end}')
+world.debug.draw_string(get_start.transform.location, 'S', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
+world.debug.draw_string(get_end.transform.location, 'E', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
 print('============================================================')
 try:
 
-    dstar_lite = DStarLite(world, get_start, get_end,all_waypoints,wp_pts)
+    # dstar_lite = DStarLite(world=world, start_waypoint=get_start, end_waypoint=get_end, all_waypoints=all_waypoints,wp_pts=wp_pts)
+    # dstar_lite = DStarLite(world, get_end, get_start, all_waypoints, wp_pts)
+    dstar_lite = DStarLite(world, get_start, get_end, all_waypoints, wp_pts)
     dstar_lite.initialize()
     dstar_lite.main()
 
