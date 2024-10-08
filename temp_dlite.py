@@ -51,24 +51,22 @@ class DStarLite:
                 
         for i in range(len(neighbors)):
             initial_dist = neighbors[i].transform.location.distance(waypoint.transform.location)
+            # initial_dist = .5
             if self.g.get(neighbors[i].id) is None:
                 for z in self.all_waypoints:
                     if neighbors[i].transform.location.distance(z.transform.location) < initial_dist:
                         x = z
+                        initial_dist=neighbors[i].transform.location.distance(z.transform.location)
+
                 # print(f'x {x}')
                 neighbors[i] = x
         return neighbors
     def predecessors(self, waypoint):
-        
-        neighbors = []
-        # Pred(the waypoint) is visible
-        # self.world.debug.draw_string(waypoint.transform.location, 'pred', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
 
+        neighbors = []
         # Backward neighbor
         Backward = waypoint.previous(1)
-        # print(f'Backward {Backward[0]}')
         if Backward:
-            
             neighbors.extend(Backward)
         
         # Legal left lane change
@@ -83,31 +81,21 @@ class DStarLite:
             if right_lane and right_lane.lane_type == carla.LaneType.Driving:
                 neighbors.append(right_lane)
 
-        # print(f'neighbors {neighbors}')
-        # print(f'bef neighbors:: {neighbors[0]}')
-        # print(f'bef neighbors:: {neighbors[1]}')
-        # self.world.debug.draw_string(neighbors[0].transform.location, 'weutowr', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
-
-        # self.world.debug.draw_string(neighbors[1].transform.location, 'yweiytwiuy', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
-
-        # x = self.wp_pos[waypoint.id]
-        # print(f'x {x}')
         for i in range(len(neighbors)):
             initial_dist = neighbors[i].transform.location.distance(waypoint.transform.location)
+            # initial_dist = .5
             if self.g.get(neighbors[i].id) is None:
                 for z in self.all_waypoints:
                     if neighbors[i].transform.location.distance(z.transform.location) < initial_dist:
                         x = z
+                        initial_dist=neighbors[i].transform.location.distance(z.transform.location)
                 # print(f'x {x}')
+                # vvv is why i use range and not just for i in neighbors, can't assign i=x
                 neighbors[i] = x
                 # print(f'i {neighbors[i]}')
 
-        # print(f'end neighbors:: {neighbors[0]}')
-        # print(f'end neighbors:: {neighbors[1]}')
-        # print(f'[0] should be neighbors:: {self.map.get_waypoint(neighbors[0].transform.location, project_to_road=True)}')
-        # print(f'[1] should be neighbors:: {self.map.get_waypoint(neighbors[1].transform.location, project_to_road=True)}')
-        # print(f'end neighbors:: {neighbors}')
-        
+        for i in neighbors:
+            self.world.debug.draw_string(i.transform.location, 'weutowr', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
         return neighbors
     
     def heuristic(self, waypoint1, waypoint2):
@@ -223,8 +211,7 @@ class DStarLite:
                 pred = self.predecessors(u)
                 # print('h')
                 pred.append(u)
-                # for i in range(len(self.all_waypoints)-3):
-                #     self.world.debug.draw_string(self.all_waypoints[i].transform.location, f'{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
+
 
                 for s in pred:
                     # print(f's:: {s}')
@@ -249,8 +236,8 @@ class DStarLite:
             # print(f'self.U {self.U.vertices_in_heap}')
             # print(f'STUFF1:::{self.U.top_key() < self.calculate_key(self.start)}')
             # print(f'STUFF2::: {self.rhs[self.start.id] > self.g[self.start.id]}')
-        for i in self.U.heap:
-            print(f'U: k1={i.priority.k1}||k2={i.priority.k2}||v={i.vertex}')
+        # for i in self.U.heap:
+        #     print(f'U: k1={i.priority.k1}||k2={i.priority.k2}||v={i.vertex}')
         for i in self.U.vertices_in_heap:
             self.world.debug.draw_string(i.transform.location, f'!{self.rhs[i.id]}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
             
@@ -512,6 +499,8 @@ try:
 
     # dstar_lite = DStarLite(world=world, start_waypoint=get_start, end_waypoint=get_end, all_waypoints=all_waypoints,wp_pts=wp_pts)
     # dstar_lite = DStarLite(world, get_end, get_start, all_waypoints, wp_pts)
+    for i in range(len(all_waypoints)-3):
+        world.debug.draw_string(all_waypoints[i].transform.location, f'{i}', draw_shadow=False, color=carla.Color(r=00, g=110, b=00), life_time=60.0, persistent_lines=True)
     dstar_lite = DStarLite(world, get_start, get_end, all_waypoints, wp_pts)
     dstar_lite.initialize()
     dstar_lite.main()
