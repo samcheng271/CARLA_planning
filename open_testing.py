@@ -1,6 +1,7 @@
 import carla
 import numpy as np
 import random
+import math
 from queue import PriorityQueue
 
 #consider move-robot-how does move-robot compare to move_vehicle 
@@ -36,19 +37,20 @@ class D_star(object):
         #self.state_space = self.x0 
         self.xt = end_waypoint
         print(f'end_waypoint: {self.xt.transform.location}')
-        
+    
+    
     #this function is good 
     def populate_open(self):
-        """
+        
         if self.next_waypoint:
             child_waypoints = [self.next_waypoint]
             self.next_waypoint = None
         else:
             child_waypoints = self.children(self.state_space)
-        """
+        
+        
         child_waypoints = self.children(self.state_space)
         print(f"Total child waypoints found: {len(child_waypoints)}")
-        #call funciton here that takes into consideration obstalce avoidance
     
         for child in child_waypoints:
             if child in self.V:
@@ -57,16 +59,13 @@ class D_star(object):
 
             print(f"Processing child waypoint: {child.transform.location}")
 
-            key = self.cost(self.state_space, child)
-            #when items that are correclty getting accessed we don't need to check for existing items
-            #temp fix 
+            key = self.cost(self.state_space, child) + self.store_h(child)
             existing_items = [item for item in self.OPEN.queue if abs(item[0] - key) < 1e-6]
 
             if not existing_items:
                 self.OPEN.put((key, child))
                 print(f"OPEN: {child} key: {key}")
                 self.V.add(child)
-                #print(f"V: {self.V}")
             else:
                 print(f"Key {key} exists")
                 next_waypoints = self.children(child)
@@ -76,17 +75,29 @@ class D_star(object):
                     print(f"Next waypoint: {self.next_waypoint.transform.location}")
                 else:
                     print("No next waypoint")
-    
-        #OPEN should always have max 5 points
+
         print(f"OPEN queue size: {self.OPEN.qsize()}")
     
         return self.OPEN
+    
+    '''
+    def populate_open(self):
+        #must hold states that need to be evaluated throughout 
+        #this k calc makes sense because when youre doing key calc both are important but process state alr takes into account this
+        key = self.cost(self.x0, self.state_space) + self.store_h(self.state_space)
+        self.OPEN.put((key, self.state_space))
+        print(f"OPEN: {key}")
+        self.V.add(self.state_space)
+        return self.OPEN
+
+    '''
+    
     """
     def delete(self, state):
-        self.OPEN.remove(state)
+        self.OPEN.remove(state)f
         self.tag[state.id] = "Closed"
     """
-
+    
     def cost(self, wp1, wp2):
         distance = wp1.transform.location.distance(wp2.transform.location)
         print(f"Calculating distance between:")
@@ -96,6 +107,37 @@ class D_star(object):
         print(f"x0: {self.x0}")
         print(f"xt: {self.xt}")
         return distance
+    
+    def store_h(self, state):
+        
+        #Euclidean distance between 3D points
+
+        #:param location_1, location_2: 3D points
+        if state is None:
+            return float('inf')
+
+        if state.id not in self.h:
+            
+            x = self.xt.transform.location.x - state.transform.location.x
+            y = self.xt.transform.location.y - state.transform.location.y
+            z = self.xt.transform.location.z - state.transform.location.z
+            #test_distance = carla.Location(x=1.0, y=2.0, z=0.0)
+            #x = carla.distance(x)
+            #norm = np.linalg.norm([x, y, z]) + np.finfo(float).eps
+            print(f"State: Location({self.state.transform.location.x}, {self.state.transform.location.y}, {self.state.transform.location.z})")
+            print(f"Self.xt: Location({self.xt.transform.location.x}, {self.xt.transform.location.y}, {self.xt.transform.location.z})")
+            print(f"x: {float(self.xt.transform.location.x) - float(state.transform.location.x)}")
+            print(f"y: {self.xt.transform.location.y - state.transform.location.y}")
+            print(f"random: {math.sqrt(x**2 + y**2)}")
+            #print(f"test_dist: {norm}")
+            """
+            heuristic = 0
+            self.h[state.id] = heuristic
+            print(f"store_h, heuristic: {heuristic}")
+            """
+
+            self.h[state.id] = norm 
+        return self.h[state.id]
     
     def get_kmin(self):
         if self.OPEN:
@@ -136,7 +178,8 @@ class D_star(object):
         self.tag[state.id] = 'Open'
         self.OPEN.put((kx, state)) 
         print(f'Inserted state {state} with key {kx}')
-    
+
+    '''
     def store_h(self, state):
         if state is None:
             return float('inf')
@@ -154,6 +197,7 @@ class D_star(object):
             """
             self.h[state.id] = heuristic
         return self.h[state.id]
+    '''
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
@@ -172,7 +216,7 @@ class D_star(object):
         #print(f'Checked state: {x}')
         print(f'x: {x}, kold: {kold}')
         #print(f'h: {self.h}') #len of self.h = 0
-        print(f'b: {self.b}')
+        #print(f'b: {self.b}')
         if x not in self.V:
             for y in self.children(x):
                 #self.checkState(y)  
