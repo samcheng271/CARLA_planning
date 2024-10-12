@@ -124,7 +124,7 @@ class D_star(object):
             #test_distance = carla.Location(x=1.0, y=2.0, z=0.0)
             #x = carla.distance(x)
             #norm = np.linalg.norm([x, y, z]) + np.finfo(float).eps
-            print(f"State: Location({self.state.transform.location.x}, {self.state.transform.location.y}, {self.state.transform.location.z})")
+            print(f"State: Location({state.transform.location.x}, {state.transform.location.y}, {state.transform.location.z})")
             print(f"Self.xt: Location({self.xt.transform.location.x}, {self.xt.transform.location.y}, {self.xt.transform.location.z})")
             print(f"x: {float(self.xt.transform.location.x) - float(state.transform.location.x)}")
             print(f"y: {self.xt.transform.location.y - state.transform.location.y}")
