@@ -40,16 +40,17 @@ class D_star(object):
     
     
     #this function is good 
-    def populate_open(self):
+    def populate_open(self, state):
         
         if self.next_waypoint:
             child_waypoints = [self.next_waypoint]
             self.next_waypoint = None
         else:
-            child_waypoints = self.children(self.state_space)
+            state = self.state_space
+            child_waypoints = self.children(state)
         
         
-        child_waypoints = self.children(self.state_space)
+        #child_waypoints = self.children(self.state_space)
         print(f"Total child waypoints found: {len(child_waypoints)}")
     
         for child in child_waypoints:
@@ -94,10 +95,10 @@ class D_star(object):
     
     """
     def delete(self, state):
-        self.OPEN.remove(state)f
+        self.OPEN.remove(state)
         self.tag[state.id] = "Closed"
     """
-    
+    '''
     def cost(self, wp1, wp2):
         distance = wp1.transform.location.distance(wp2.transform.location)
         print(f"Calculating distance between:")
@@ -123,12 +124,12 @@ class D_star(object):
             z = self.xt.transform.location.z - state.transform.location.z
             #test_distance = carla.Location(x=1.0, y=2.0, z=0.0)
             #x = carla.distance(x)
-            #norm = np.linalg.norm([x, y, z]) + np.finfo(float).eps
+            norm = np.linalg.norm([x, y, z]) + np.finfo(float).eps
             print(f"State: Location({state.transform.location.x}, {state.transform.location.y}, {state.transform.location.z})")
             print(f"Self.xt: Location({self.xt.transform.location.x}, {self.xt.transform.location.y}, {self.xt.transform.location.z})")
             print(f"x: {float(self.xt.transform.location.x) - float(state.transform.location.x)}")
             print(f"y: {self.xt.transform.location.y - state.transform.location.y}")
-            print(f"random: {math.sqrt(x**2 + y**2)}")
+            #print(f"random: {math.sqrt(x**2 + y**2)}")
             #print(f"test_dist: {norm}")
             """
             heuristic = 0
@@ -155,7 +156,7 @@ class D_star(object):
             print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
             return minimum[0], minimum[1] #returns state k with associated key value
         return None, -1
-    
+    '''
     #make sure tags are updated correctly 
     def insert(self, h_new, state):
         print(f"h_new: {h_new}")
@@ -289,7 +290,33 @@ class D_star(object):
                         #print(f'Insert y: {y} with h[y]: {self.h[y.id]}')
                         self.insert(self.h[y.id], y)
             print("No min")
-        return self.get_kmin()
+            #made change here
+        return self.get_kmin(), y
+    
+    def modify_cost(self, state):
+        x_parent = self.b[state.id]
+        print(f'modify_cost: xparent: {x_parent}')
+        if self.tag[state.id] == 'Closed':
+            print(f'state_space {state} is Closed')
+            print("6")
+            cost_value = self.h[x_parent.id] + self.cost(state, x_parent)
+            print(f"cost(state_space, xparent): {self.cost(state, x_parent)}")
+            self.insert(cost_value, state)
+
+
+    #repair_replan, check
+    def modify(self, state):
+        #print(f'modify: state_space: {state_space}')
+        self.modify_cost(state)
+        kmin = self.get_kmin()
+        #this could be causing the inf loop because if kmin is never updates it is always greater than h
+        while kmin is not None and kmin < self.h[state.id]:          
+            kmin, y = self.process_state()
+            print(f'process_state returned kmin: {kmin}')
+            if kmin is None or kmin >= self.h[state.id] or kmin == -1:
+                return -1 
+        
+        self.Path(y)
 
     def children(self, state):
         children = []
@@ -334,7 +361,138 @@ class D_star(object):
             """
 
         return children  
+    
+    def detect_obstacles(self, state_space):
+        child_waypoints = self.children(state_space)
+        for child in child_waypoints:
+            child_location = child.transform.location
+            for actor in world.get_actors():
+                if actor.id != self.vehicle.id: 
+                    actor_location = actor.get_location()
+                    if actor_location.distance(child_location) < 5.0:
+                        return True         
+        return False
+    
+    def handle_obstacles(self):
+        """
+        Detect obstacles and handle states accordingly.
+        If obstacles are detected, recalculates children and updates the state space.
+        """
+        if self.detect_obstacles():
+            print("Obstacle detected.")
+        
+            child_waypoints = self.children(self.state_space)
+            for child in child_waypoints:
+                self.delete(child)
+                self.modify(child)  # modify for deleted child
+            
+            if not self.OPEN.empty():
+                #self.populate_open()
+                kold, x = self.min_state()
+                self.state_space = x
+                next_waypoints = self.children(self.state_space)
+                
+                for waypoint in next_waypoints:
+                    self.modify_cost(waypoint)  # Modify_cost for new waypoints
+                
+                print(f"Next waypoints recalculated: {[wp.transform.location for wp in next_waypoints]}")
+            
+        else:
+            print("No obstacles detected")
 
+    #backpointer list 
+    def path(self, state):
+        #goal = self.xt
+        self.Path = [self.state_space]
+        
+        """
+        if not goal:
+            trace_state = self.x0
+            print(f'No goal provided, using x0: {trace_state}')
+        else:
+            trace_state = goal
+            print(f'Goal provided: {self.goal_location}, start: {self.x0}')
+        #start = self.xt
+        """ 
+        cost = 0
+        search_state = self.x0
+        while self.state_space != self.xt and self.state_space != None:
+            x = self.b[self.state_space.id]
+            #trace_location = np.array([trace_state.transform.location.x, trace_state.transform.location.y, trace_state.transform.location.z])
+            #parent_location = np.array([x.transform.location.x, x.transform.location.y, x.transform.location.z])
+            cost = cost + self.cost(search_state, x)
+            search_state = x
+            self.Path.append(x)
+
+            #trace_state = x
+            print(f"path append: {x}")
+
+        while x != self.xt:
+            self.Path = []
+
+        return self.Path
+
+
+    #controls vehicle to be moved from one place to another
+    
+    def move_vehicle(self):
+        if not self.vehicle:
+            #print("Vehicle not initialized.")
+            return
+
+        if self.Path:
+            next_waypoint = self.Path[0]
+            location = carla.Location(next_waypoint.transform.location.x, next_waypoint.transform.location.y, next_waypoint.transform.location.z)
+            self.vehicle.set_location(location)
+        else:
+            print("Path empty.")
+    
+    
+    def visualize_path(self, path):
+        debug = self.world.debug
+        for segment in path:
+            self.x0, self.xt = segment
+            debug.draw_line(
+                carla.Location(x=self.x0.transform.location.x, y=self.x0.transform.location.y, z=self.x0.transform.location.z),
+                carla.Location(x=self.xt.transform.location.x, y=self.xt.transform.location.y, z=self.xt.transform.location.z),
+                thickness=0.1, color=carla.Color(r=255, g=0, b=0), life_time=15.0
+            )
+
+    def visualize_path(self, path):
+        debug = self.world.debug
+        for segment in path:
+            self.x0, self.xt = segment
+            debug.draw_line(
+                carla.Location(x=self.x0.transform.location.x, y=self.x0.transform.location.y, z=self.x0.transform.location.z),
+                carla.Location(x=self.xt.transform.location.x, y=self.xt.transform.location.y, z=self.xt.transform.location.z),
+                thickness=0.1, color=carla.Color(r=255, g=0, b=0), life_time=15.0
+            )
+
+    
+    def run(self):
+
+        self.state_space = self.x0
+        self.tag[self.x0] = 'New'
+        self.populate_open(self.x0)
+        while self.state_space != self.xt:
+            if self.state_space == self.x0:
+                s_parent = self.b[self.x0]
+            else:
+                s_parent = self.b[self.state_space]
+            #for self.state_space is progressing to the next optimal path
+            self.populate_open(self.state_space)
+            if self.detect_obstacles() == True:
+                self.modify(self.state_space) 
+                self.delete(self.state_space)
+                _, new_state = self.process_state()
+                self.populate_open(new_state)
+                self.tag[self.state_space] == 'Closed'
+                self.Path = self.path(s_parent)
+                self.visualize_path
+                
+            self.ind += 1
+        
+    
 if __name__ == '__main__':
     client = carla.Client('localhost', 2000)
     client.set_timeout(10.0)
