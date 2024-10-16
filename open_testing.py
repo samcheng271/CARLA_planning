@@ -49,7 +49,6 @@ class D_star(object):
             state = self.state_space
             child_waypoints = self.children(state)
         
-        
         #child_waypoints = self.children(self.state_space)
         print(f"Total child waypoints found: {len(child_waypoints)}")
     
@@ -142,7 +141,7 @@ class D_star(object):
     
     def get_kmin(self):
         if self.OPEN:
-            self.populate_open()
+            self.populate_open(self.state_space)
             print(f"OPEN: {self.OPEN.empty()}")
             minimum = self.OPEN.get() # Return the tuple with the minimum key value
             print(f'get_kmin: minimum: {minimum[0]}')
@@ -151,7 +150,7 @@ class D_star(object):
     def min_state(self):
         if self.OPEN:
             print("min_state")
-            self.populate_open()
+            self.populate_open(self.state_space)
             minimum = self.OPEN.get()
             print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
             return minimum[0], minimum[1] #returns state k with associated key value
@@ -172,6 +171,7 @@ class D_star(object):
         elif state_tag == 'Open':
             kx = min(kmin, h_new)
             print(f"kx: {kx}")
+            #may need to repopulate here
         elif state_tag == 'Closed':
             kx = min(self.h[state.id], h_new)
             print(f"kx: {kx}")
@@ -291,7 +291,7 @@ class D_star(object):
                         self.insert(self.h[y.id], y)
             print("No min")
             #made change here
-        return self.get_kmin(), y
+        return self.min_state()
     
     def modify_cost(self, state):
         x_parent = self.b[state.id]
@@ -378,7 +378,7 @@ class D_star(object):
         Detect obstacles and handle states accordingly.
         If obstacles are detected, recalculates children and updates the state space.
         """
-        if self.detect_obstacles():
+        if self.detect_obstacles(self.state_space):
             print("Obstacle detected.")
         
             child_waypoints = self.children(self.state_space)
@@ -403,6 +403,7 @@ class D_star(object):
     #backpointer list 
     def path(self, state):
         #goal = self.xt
+        state = self.state_space
         self.Path = [self.state_space]
         
         """
@@ -474,44 +475,65 @@ class D_star(object):
         self.state_space = self.x0
         self.tag[self.x0] = 'New'
         self.populate_open(self.x0)
+        
+        loop_counter = 0
         while self.state_space != self.xt:
-            if self.state_space == self.x0:
-                s_parent = self.b[self.x0]
-            else:
-                s_parent = self.b[self.state_space]
-            #for self.state_space is progressing to the next optimal path
-            self.populate_open(self.state_space)
-            if self.detect_obstacles() == True:
-                for child_wp in self.children(self.state_space):
-                    new_min, new_state = self.process_state()
-                    curr_kmin = self.get_kmin()
-                    if new_min < curr_kmin: 
-                        self.state_space = new_state
-                        self.modify(self.state_space) 
-                        self.delete(self.state_space)
-                        self.populate_open(new_state)
-                    self.tag[self.state_space] == 'Closed'
-                    self.Path = self.path(s_parent)
-                    self.visualize_path()
+            loop_counter += 1
+            if loop_counter > 1000:
+                print("loop runs until 1000")
+                break
 
-            self.ind += 1
             curr_kmin = self.get_kmin()
-            for explore_wp in self.children(self.state_space):
-                kmin_ps, state_ps = self.process_state()
-                self.insert(kmin_ps, state_ps)
-                if new_min < self.get_kmin: 
-                    self.state_space = new_state
-                    self.modify(self.state_space)
-                    self.delete(self.state_space)
-                    self.populate_open(new_state)
-                self.tag[self.state_space] == 'Closed'
+            new_min, new_state = self.process_state()
+        
+            if self.detect_obstacles(self.state_space):
+                self.handle_obstacles()
+            else: 
+                print("No obstacles")
+
+            if new_state:
+                self.state_space = new_state
+            else: 
+                print("No new state")
+                break
+
+            if self.state_space == self.xt:
+                self.Path = self.Path(self.xt)
+                self.visualize_path(self.Path)
+                break
+
+            self.visualize_path(self.Path)
+        
             
-        if self.state_space == self.xt: 
-            self.Path = self.path(self.state_space)
+        if self.state_space != self.xt: 
+            print("No valid path")
+        else: 
+            print("path found")
 
         #exit program
 
-        
+    def move_vehicle(self):
+        if not self.vehicle:
+            #print("Vehicle not initialized.")
+            return
+
+        if self.Path:
+            next_waypoint = self.Path[0]
+            location = carla.Location(next_waypoint.transform.location.x, next_waypoint.transform.location.y, next_waypoint.transform.location.z)
+            self.vehicle.set_location(location)
+        else:
+            print("Path empty.")
+    
+    
+    def visualize_path(self, path):
+        debug = self.world.debug
+        for segment in path:
+            self.x0, self.xt = segment
+            debug.draw_line(
+                carla.Location(x=self.x0.transform.location.x, y=self.x0.transform.location.y, z=self.x0.transform.location.z),
+                carla.Location(x=self.xt.transform.location.x, y=self.xt.transform.location.y, z=self.xt.transform.location.z),
+                thickness=0.1, color=carla.Color(r=255, g=0, b=0), life_time=15.0
+            )
     
 if __name__ == '__main__':
     client = carla.Client('localhost', 2000)
@@ -554,7 +576,7 @@ if __name__ == '__main__':
         d_star.V.remove(d_star.state_space)
     
     d_star.run()
-    
+
     if d_star.state_space.transform.location == (d_star.xt.transform.location):
         print("Goal reached!")
         
