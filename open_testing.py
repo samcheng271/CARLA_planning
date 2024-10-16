@@ -93,12 +93,12 @@ class D_star(object):
 
     '''
     
-    """
+    
     def delete(self, state):
         self.OPEN.remove(state)
         self.tag[state.id] = "Closed"
-    """
-    '''
+    
+    
     def cost(self, wp1, wp2):
         distance = wp1.transform.location.distance(wp2.transform.location)
         print(f"Calculating distance between:")
@@ -156,7 +156,7 @@ class D_star(object):
             print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
             return minimum[0], minimum[1] #returns state k with associated key value
         return None, -1
-    '''
+    
     #make sure tags are updated correctly 
     def insert(self, h_new, state):
         print(f"h_new: {h_new}")
@@ -180,7 +180,7 @@ class D_star(object):
         self.OPEN.put((kx, state)) 
         print(f'Inserted state {state} with key {kx}')
 
-    '''
+    
     def store_h(self, state):
         if state is None:
             return float('inf')
@@ -198,7 +198,7 @@ class D_star(object):
             """
             self.h[state.id] = heuristic
         return self.h[state.id]
-    '''
+    
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
@@ -482,15 +482,35 @@ class D_star(object):
             #for self.state_space is progressing to the next optimal path
             self.populate_open(self.state_space)
             if self.detect_obstacles() == True:
-                self.modify(self.state_space) 
-                self.delete(self.state_space)
-                _, new_state = self.process_state()
-                self.populate_open(new_state)
-                self.tag[self.state_space] == 'Closed'
-                self.Path = self.path(s_parent)
-                self.visualize_path
-                
+                for child_wp in self.children(self.state_space):
+                    new_min, new_state = self.process_state()
+                    curr_kmin = self.get_kmin()
+                    if new_min < curr_kmin: 
+                        self.state_space = new_state
+                        self.modify(self.state_space) 
+                        self.delete(self.state_space)
+                        self.populate_open(new_state)
+                    self.tag[self.state_space] == 'Closed'
+                    self.Path = self.path(s_parent)
+                    self.visualize_path()
+
             self.ind += 1
+            curr_kmin = self.get_kmin()
+            for explore_wp in self.children(self.state_space):
+                kmin_ps, state_ps = self.process_state()
+                self.insert(kmin_ps, state_ps)
+                if new_min < self.get_kmin: 
+                    self.state_space = new_state
+                    self.modify(self.state_space)
+                    self.delete(self.state_space)
+                    self.populate_open(new_state)
+                self.tag[self.state_space] == 'Closed'
+            
+        if self.state_space == self.xt: 
+            self.Path = self.path(self.state_space)
+
+        #exit program
+
         
     
 if __name__ == '__main__':
@@ -527,33 +547,16 @@ if __name__ == '__main__':
                 vehicle=firetruck, 
                 world=world, 
                 map=carla_map)
- 
-    for waypoint in d_star.waypoints:
-        d_star.state_space = waypoint
-        result = d_star.process_state()
-        print(f"result: {result}")
-        
-        if not d_star.OPEN.empty():
-            _, update_state = d_star.min_state()
-            d_star.state_space = update_state
-            print(f"Updated state_space: {d_star.state_space.transform.location}")
 
-        if result == -1:
-            print(f"Goal reached or path not found at waypoint {waypoint.transform.location}")
-            break
-
-        d_star.populate_open()
-        child_waypoints = d_star.children(d_star.state_space)
-        for child in child_waypoints:
-            cost = d_star.cost(d_star.state_space, child)
-            print(f"Cost from {d_star.state_space.transform.location} to {child.transform.location}: {cost}")
         
-        if d_star.state_space in d_star.V:
-            d_star.V.remove(d_star.state_space)
-        
-        if d_star.state_space.transform.location == (d_star.xt.transform.location):
-            print("Goal reached!")
-            break
+    
+    if d_star.state_space in d_star.V:
+        d_star.V.remove(d_star.state_space)
+    
+    d_star.run()
+    
+    if d_star.state_space.transform.location == (d_star.xt.transform.location):
+        print("Goal reached!")
         
 
         print(f"Current state: {d_star.state_space.transform.location}")
