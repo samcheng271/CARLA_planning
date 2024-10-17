@@ -427,6 +427,7 @@ class D_star(object):
         else:
             print("Path empty.")
 
+
     def visualize_path(self, path):
         if not path:
             return
@@ -444,49 +445,50 @@ class D_star(object):
 
     
     def run(self):
+    # Initialize the start state
         self.state_space = self.x0
-        self.populate_open(self.state_space)
-    
+        self.tag[self.x0.id] = 'New'
+        self.populate_open(self.x0)
+
         while self.state_space != self.xt:
-        # Process current state
-            kmin, current_state = self.process_state()
-        
-            if kmin == -1 or current_state is None:
-                print("No path found")
-                return None
-            
-        # If goal is reached
-            if current_state.id == self.xt.id:
-                self.Path = self.path(current_state)
-                self.visualize_path(self.Path)
-                return self.Path
-            
+        # Check if the open list is empty
+            if self.OPEN.empty():
+                print("No path found.")
+                return
+
+        # Get the state with the minimum key
+            _, current_state = self.min_state()
+            self.state_space = current_state
+
+        # Check if we've reached the goal
+            if self.state_space == self.xt:
+                break
+
+        # Process the current state
+            self.process_state()
+
         # Check for obstacles
             if self.detect_obstacles(self.state_space):
-            # Handle obstacle detected
-                for child in self.children(self.state_space):
-                    self.modify(child)
-                    self.delete(child)
-                
-            # Get new best state
-                new_kmin, new_state = self.process_state()
-                if new_kmin is not None and new_state is not None:
-                    if new_kmin < kmin:
-                        self.state_space = new_state
-                        self.modify(self.state_space)
-                    
-            # Repopulate OPEN list with new states
+            # Handle obstacle detection
+                self.modify(self.state_space)
+                self.delete(self.state_space)
                 self.populate_open(self.state_space)
-            
-            else:
-            # No obstacles, continue normal path
-                self.state_space = current_state
-                self.tag[self.state_space.id] = 'Closed'
 
-            self.Path = self.path(self.state_space)
-            self.visualize_path(self.Path)
-        
-            self.ind += 1
+        # Update the tag of the current state
+            self.tag[self.state_space.id] = 'Closed'
+
+        # Visualize the current path
+            current_path = self.path(self.state_space)
+            self.visualize_path(current_path)
+
+    # Path found, construct the final path
+        self.Path = self.path(self.state_space)
+        print("Path found!")
+        self.visualize_path(self.Path)
+
+    # Move the vehicle along the path
+        for waypoint in self.Path:
+           self.move_vehicle(waypoint)
 
         #exit program
 
