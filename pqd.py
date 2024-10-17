@@ -4,7 +4,7 @@ import numpy as np
 import random
 from collections import defaultdict
 from queue import PriorityQueue
-
+ 
 #functions that could be causing issues: 1. populate_open, insert, modify/modify_cost, run
 #^functions are logically correct but waypoint handling maybe causing errors 
 class D_star(object):
@@ -43,7 +43,6 @@ class D_star(object):
     # keys are used which causes waypoints to be compared instead in the tuple->not 
     # allowed in priority queue calculations thus error occurs
     
-    """
     #this function is good 
     def populate_open(self):
         
@@ -89,7 +88,7 @@ class D_star(object):
         print(f"OPEN queue size: {self.OPEN.qsize()}")
     
         return self.OPEN
-    """
+    
     
    # Checks if a 'y' state has both heuristic and tag dicts
     def checkState(self, y):
