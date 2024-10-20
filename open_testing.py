@@ -27,8 +27,8 @@ class D_star(object):
         self.vehicle = vehicle
         self.state = self.waypoint
         self.location = self.vehicle.get_location()
-        #self.state_space = self.map.get_waypoint(self.location, project_to_road=True)
-        self.state_space = start_waypoint
+        self.state_space = self.map.get_waypoint(self.location, project_to_road=True)
+        #self.state_space = start_waypoint
         self.waypoints = self.map.generate_waypoints(self.resolution)
         print(f"Number of waypoints generated: {len(self.waypoints)}")
         self.h = {}
@@ -43,42 +43,64 @@ class D_star(object):
     #this function is good 
     def populate_open(self, state):
         
+        print("\n=== Starting populate_open() function ===")
+        print(f"Initial state: {state}")
+        print(f"Current next_waypoint status: {self.next_waypoint is not None}")
+        
         if self.next_waypoint:
+            print(f"Using stored next_waypoint: {self.next_waypoint.transform.location}")
             child_waypoints = [self.next_waypoint]
             self.next_waypoint = None
+            print("Reset next_waypoint to None")
         else:
-            state = self.state_space
+            print("No stored next_waypoint, generating child waypoints")
             child_waypoints = self.children(state)
-        
-        #child_waypoints = self.children(self.state_space)
-        print(f"Total child waypoints found: {len(child_waypoints)}")
-    
-        for child in child_waypoints:
-            if child.id in self.V: 
-                print(f"Already processed waypoint: {child.transform.location}")
+            
+        print(f"\nTotal child waypoints found: {len(child_waypoints)}")
+        print(f"Child waypoint locations: {[wp.transform.location for wp in child_waypoints]}")
+
+        print("\n=== Processing each child waypoint ===")
+        for i, child in enumerate(child_waypoints):
+            print(f"\nProcessing child {i + 1}/{len(child_waypoints)}")
+            print(f"Child location: {child.transform.location}")
+            
+            if child in self.V:
+                print(f"Skipping already processed waypoint: {child.transform.location}")
                 continue
 
-            print(f"Processing child waypoint: {child.transform.location}")
-
-            key = self.cost(self.state_space, child) + self.store_h(child)
+            print(f"Computing cost for child waypoint")
+            cost = self.cost(state, child)
+            h_value = self.store_h(child)
+            key = cost + h_value
+            print(f"Cost: {cost}, H-value: {h_value}, Total key: {key}")
+            
+            print("Checking for existing similar keys in OPEN queue")
             existing_items = [item for item in self.OPEN.queue if abs(item[0] - key) < 1e-6]
+            print(f"Found {len(existing_items)} similar keys")
 
             if not existing_items:
+                print(f"No similar keys found, adding to OPEN queue with key: {key}")
                 self.OPEN.put((key, child))
-                print(f"OPEN: {child} key: {key}")
+                print(f"Added to OPEN: Waypoint at {child.transform.location} with key {key}")
+                print(f"Current state: {state.transform.location}")
                 self.V.add(child)
+                print(f"Added waypoint to visited set V")
             else:
-                print(f"Key {key} exists")
+                print(f"\nSimilar key {key} already exists")
+                print("Generating next waypoints for current child")
                 next_waypoints = self.children(child)
 
                 if next_waypoints:
                     self.next_waypoint = next_waypoints[0]
-                    print(f"Else: Next waypoint: {self.next_waypoint.transform.location}")
+                    print(f"Stored new next_waypoint: {self.next_waypoint.transform.location}")
                 else:
-                    print("No next waypoint")
+                    print("No next waypoints available")
 
-        print(f"OPEN queue size: {self.OPEN.qsize()}")
-    
+        print(f"\n=== Populate_open() Summary ===")
+        print(f"Final OPEN queue size: {self.OPEN.qsize()}")
+        print(f"Visited set V size: {len(self.V)}")
+        print("=== End populate_open() ===\n")
+        
         return self.OPEN
     
     '''
@@ -93,9 +115,9 @@ class D_star(object):
 
     '''
     def delete(self, state):
-        self.OPEN.remove(state)
+        while not self.OPEN.empty():
+            self.OPEN.get()
         self.tag[state.id] = "Closed"
-    
     
     def cost(self, wp1, wp2):
         distance = wp1.transform.location.distance(wp2.transform.location)
@@ -171,6 +193,7 @@ class D_star(object):
             kx = min(kmin, h_new)
             print(f"kx: {kx}")
             #may need to repopulate here
+            self.delete()
         elif state_tag == 'Closed':
             kx = min(self.h[state.id], h_new)
             print(f"kx: {kx}")
@@ -318,48 +341,70 @@ class D_star(object):
         self.Path(y)
 
     def children(self, state):
+        print("\n=== Starting children() function ===")
+        print(f"Initial state: {state}")
+        
         children = []
         if state is None:
+            print("State is None, returning empty children list")
             return children
 
         next_waypoint = state.next(2.0)
-        print(f"Children next waypoints: {[wp.transform.location for wp in next_waypoint]}")
+        print(f"Next waypoints: {[wp.transform.location for wp in next_waypoint]}")
+        
         if next_waypoint:
-            """
-            for wp in next_waypoint:
-                if wp.transform.location not in [c.transform.location for c in children]:
-            """
+            print(f"Adding {len(next_waypoint)} next waypoints to children")
             children.extend(next_waypoint)
 
+        print(f"\nChecking lane changes from current state at {state.transform.location}")
+        
         if state.lane_change & carla.LaneChange.Left:
+            print("Left lane change is possible")
             left_wp = state.get_left_lane()
+            print(f"Left waypoint obtained: {left_wp}")
+            
             if left_wp and left_wp.lane_type == carla.LaneType.Driving:
-                #if left_wp.transform.location not in [c.transform.location for c in children]:
-                    children.append(left_wp)
-                    print(f"Left waypoint: {left_wp.transform.location if left_wp else 'None'}")
-            """
-                diag_left_wp = left_wp.next(2.0)
-                if diag_left_wp:
-                    for wp in diag_left_wp:
-                        if wp.transform.location not in [c.transform.location for c in children]:
-                            children.append(wp)
-            """
+                print(f"Adding left waypoint: {left_wp.transform.location}")
+                children.append(left_wp)
+                print(f"Left waypoint: {left_wp.transform.location if left_wp else 'None'}")
 
         if state.lane_change & carla.LaneChange.Right:
+            print("Right lane change is possible")
             right_wp = state.get_right_lane()
+            print(f"Right waypoint obtained: {right_wp}")
+            
             if right_wp and right_wp.lane_type == carla.LaneType.Driving:
-                #if right_wp.transform.location not in [c.transform.location for c in children]:
-                    children.append(right_wp)
-                    print(f"Right waypoint: {right_wp.transform.location if right_wp else 'None'}")
-            """
-                diag_right_wp = right_wp.next(2.0)
-                if diag_right_wp:
-                    for wp in diag_right_wp:
-                        if wp.transform.location not in [c.transform.location for c in children]:
-                            children.append(wp)
-            """
+                print(f"Adding right waypoint: {right_wp.transform.location}")
+                children.append(right_wp)
+                print(f"Right waypoint: {right_wp.transform.location if right_wp else 'None'}")
 
-        return children  
+        print(f"\nStarting waypoint optimization loop for {len(children)} children")
+        for i in range(len(children)):
+            print(f"\nProcessing child {i}")
+            initial_dist = children[i].transform.location.distance(state.transform.location)
+            print(f"Initial distance from state: {initial_dist}")
+            
+            if children[i].id is not None:
+                print(f"Current child ID: {children[i].id}")
+                min_dist = float('inf')
+                best_waypoint = None
+                
+                for z in children:
+                    curr_dist = children[i].transform.location.distance(z.transform.location)
+                    print(f"Distance to other waypoint: {curr_dist}")
+                    
+                    if curr_dist < min_dist:
+                        min_dist = curr_dist
+                        best_waypoint = z
+                        print(f"New minimum distance found: {min_dist}")
+                
+                if best_waypoint is not None:
+                    print(f"Updating waypoint {i} with closer waypoint at distance {min_dist}")
+                    children[i] = best_waypoint
+
+        print(f"\n=== Returning {len(children)} children ===")
+        print(f"Final children locations: {[c.transform.location for c in children]}\n")
+        return children
     
     def detect_obstacles(self, state_space):
         child_waypoints = self.children(state_space)
@@ -401,8 +446,8 @@ class D_star(object):
 
     #backpointer list 
     def path(self, state):
-        self.Path = [self.state_space]
-        search_state = self.state_space
+        self.Path = [state]
+        search_state = state
     
         while search_state != self.xt and search_state is not None:
             if search_state.id not in self.b:
@@ -445,48 +490,37 @@ class D_star(object):
 
     
     def run(self):
-    # Initialize the start state
         self.state_space = self.x0
         self.tag[self.x0.id] = 'New'
         self.populate_open(self.x0)
 
         while self.state_space != self.xt:
-        # Check if the open list is empty
             if self.OPEN.empty():
                 print("No path found.")
                 return
 
-        # Get the state with the minimum key
             _, current_state = self.min_state()
             self.state_space = current_state
 
-        # Check if we've reached the goal
             if self.state_space == self.xt:
                 break
 
-        # Process the current state
             self.process_state()
 
-        # Check for obstacles
             if self.detect_obstacles(self.state_space):
-            # Handle obstacle detection
                 self.modify(self.state_space)
                 self.delete(self.state_space)
                 self.populate_open(self.state_space)
 
-        # Update the tag of the current state
             self.tag[self.state_space.id] = 'Closed'
 
-        # Visualize the current path
             current_path = self.path(self.state_space)
             self.visualize_path(current_path)
 
-    # Path found, construct the final path
         self.Path = self.path(self.state_space)
         print("Path found!")
         self.visualize_path(self.Path)
 
-    # Move the vehicle along the path
         for waypoint in self.Path:
            self.move_vehicle(waypoint)
 
@@ -504,7 +538,7 @@ class D_star(object):
         else:
             print("Path empty.")
     
-    
+    '''
     def visualize_path(self, path):
         debug = self.world.debug
         for segment in path:
@@ -514,6 +548,7 @@ class D_star(object):
                 carla.Location(x=self.xt.transform.location.x, y=self.xt.transform.location.y, z=self.xt.transform.location.z),
                 thickness=0.1, color=carla.Color(r=255, g=0, b=0), life_time=15.0
             )
+    '''
     
 if __name__ == '__main__':
     client = carla.Client('localhost', 2000)
