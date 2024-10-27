@@ -2,7 +2,7 @@ import carla
 import sys
 
 sys.path.append('../')
-from agents.navigation.global_route_planner_og import GlobalRoutePlanner
+from agents.navigation.global_route_planner import GlobalRoutePlanner
 import random
 from agents.navigation.basic_agent import BasicAgent
 # from agents.navigation.global_route_planner_og import GlobalRoutePlanner # original route planner
