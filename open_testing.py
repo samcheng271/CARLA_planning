@@ -58,6 +58,7 @@ class D_star(object):
         print(f"Child waypoint locations: {[wp.transform.location for wp in child_waypoints]}")
 
         for child in child_waypoints:
+            #cost calculation here occurs for every single child
             print(f"Child location: {child.transform.location}")
             
             if child in self.V:
@@ -107,8 +108,6 @@ class D_star(object):
         print(f"  Waypoint 1: Location({wp1.transform.location.x}, {wp1.transform.location.y}, {wp1.transform.location.z})")
         print(f"  Waypoint 2: Location({wp2.transform.location.x}, {wp2.transform.location.y}, {wp2.transform.location.z})")
         print(f"  Distance: {distance}")
-        print(f"x0: {self.x0}")
-        print(f"xt: {self.xt}")
         return distance
     
     def store_h(self, state):
@@ -142,19 +141,18 @@ class D_star(object):
     
     def get_kmin(self):
         if self.OPEN:
-            self.populate_open(self.state_space)
+            #self.populate_open(self.state_space)
             print(f"OPEN: {self.OPEN.empty()}")
-            minimum = self.OPEN.get() # Return the tuple with the minimum key value
+            minimum = self.OPEN.get() 
             print(f'get_kmin: minimum: {minimum[0]}')
             return minimum[0]
         
     def min_state(self):
         if self.OPEN:
-            print("min_state")
-            self.populate_open(self.state_space)
+            #self.populate_open(self.state_space)
             minimum = self.OPEN.get()
             print(f'get_kmin, state: key: {minimum[0]}, state: {minimum[1]}')
-            return minimum[0], minimum[1] #returns state k with associated key value
+            return minimum[0], minimum[1]
         return None, -1
     
     #make sure tags are updated correctly 
@@ -184,26 +182,6 @@ class D_star(object):
         self.tag[state.id] = 'Open'
         self.OPEN.put((kx, state)) 
         print(f'Inserted state {state} with key {kx}')
-
-    
-    def store_h(self, state):
-        if state is None:
-            return float('inf')
-
-        if state.id not in self.h:
-            
-            heuristic = state.transform.location.distance(self.xt.transform.location)
-            print(f"State: Location({self.state.transform.location.x}, {self.state.transform.location.y}, {self.state.transform.location.z})")
-            print(f"Self.xt: Location({self.xt.transform.location.x}, {self.xt.transform.location.y}, {self.xt.transform.location.z})")
-            print(f"store_h, heuristic: {heuristic}")
-            """
-            heuristic = 0
-            self.h[state.id] = heuristic
-            print(f"store_h, heuristic: {heuristic}")
-            """
-            self.h[state.id] = heuristic
-        return self.h[state.id]
-    
 
     #see how process state goes through obstacle avoidance
     def process_state(self):
