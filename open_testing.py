@@ -367,9 +367,9 @@ class D_star(object):
         if next_waypoint:
             print(f"Adding {len(next_waypoint)} next waypoints to children")
             children.extend(next_waypoint)
-            self.world.debug.draw_string(i.transform.location, '0', draw_shadow=False, 
-                                        color=carla.Color(r=220, g=0, b=0), life_time=60.0, 
-                                        persistent_lines=True)
+            #self.world.debug.draw_string(next_waypoint.transform.location, '0', draw_shadow=False, 
+                                        #color=carla.Color(r=220, g=0, b=0), life_time=60.0, 
+                                        #persistent_lines=True)
 
         if state.lane_change & carla.LaneChange.Left:
             left_wp = state.get_left_lane()
@@ -378,7 +378,7 @@ class D_star(object):
             if left_wp and left_wp.lane_type == carla.LaneType.Driving:
                 print(f"Adding left waypoint: {left_wp.transform.location}")
                 children.append(left_wp)
-                self.world.debug.draw_string(i.transform.location, '0', draw_shadow=False, 
+                self.world.debug.draw_string(left_wp.transform.location, '0', draw_shadow=False, 
                                         color=carla.Color(r=220, g=0, b=0), life_time=60.0, 
                                         persistent_lines=True)
                 print(f"Left waypoint: {(left_wp.transform.location.x, left_wp.transform.location.y, left_wp.transform.location.z) if left_wp else 'None'}")
@@ -390,7 +390,7 @@ class D_star(object):
             if right_wp and right_wp.lane_type == carla.LaneType.Driving:
                 print(f"Adding right waypoint: {right_wp.transform.location}")
                 children.append(right_wp)
-                self.world.debug.draw_string(i.transform.location, '0', draw_shadow=False, 
+                self.world.debug.draw_string(right_wp.transform.location, '0', draw_shadow=False, 
                                         color=carla.Color(r=220, g=0, b=0), life_time=60.0, 
                                         persistent_lines=True)
                 print(f"Right waypoint: {(right_wp.transform.location.x, right_wp.transform.location.y, right_wp.transform.location.z) if right_wp else 'None'}")
@@ -468,15 +468,25 @@ class D_star(object):
 
     #backpointer list 
     def path(self, state):
+        print(f"Starting path search from state: {state}")
+        
         self.Path = [state]
         search_state = state
-    
+        
         while search_state != self.xt and search_state is not None:
+            print(f"Current search state: {search_state}")
+            
             if search_state.id not in self.b:
+                print("No path exists. Returning an empty list.")
                 return []  # No path exists
+            
             next_state = self.b[search_state.id]
+            print(f"Next state found: {next_state}")
+            
             self.Path.append(next_state)
-            search_state = next_state 
+            search_state = next_state
+
+        print(f"Path found: {self.Path}")
         return self.Path
 
     #controls vehicle to be moved from one place to another
