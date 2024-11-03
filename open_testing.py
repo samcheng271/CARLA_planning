@@ -47,7 +47,6 @@ class D_star(object):
     
     
     #this function is good 
-    
     def populate_open(self, state):
         print(f"PO state: {state}")
         print(f"Current next_waypoint status: {self.next_waypoint is not None}")
@@ -368,6 +367,9 @@ class D_star(object):
         if next_waypoint:
             print(f"Adding {len(next_waypoint)} next waypoints to children")
             children.extend(next_waypoint)
+            self.world.debug.draw_string(i.transform.location, '0', draw_shadow=False, 
+                                        color=carla.Color(r=220, g=0, b=0), life_time=60.0, 
+                                        persistent_lines=True)
 
         if state.lane_change & carla.LaneChange.Left:
             left_wp = state.get_left_lane()
@@ -376,6 +378,9 @@ class D_star(object):
             if left_wp and left_wp.lane_type == carla.LaneType.Driving:
                 print(f"Adding left waypoint: {left_wp.transform.location}")
                 children.append(left_wp)
+                self.world.debug.draw_string(i.transform.location, '0', draw_shadow=False, 
+                                        color=carla.Color(r=220, g=0, b=0), life_time=60.0, 
+                                        persistent_lines=True)
                 print(f"Left waypoint: {(left_wp.transform.location.x, left_wp.transform.location.y, left_wp.transform.location.z) if left_wp else 'None'}")
 
         if state.lane_change & carla.LaneChange.Right:
@@ -385,6 +390,9 @@ class D_star(object):
             if right_wp and right_wp.lane_type == carla.LaneType.Driving:
                 print(f"Adding right waypoint: {right_wp.transform.location}")
                 children.append(right_wp)
+                self.world.debug.draw_string(i.transform.location, '0', draw_shadow=False, 
+                                        color=carla.Color(r=220, g=0, b=0), life_time=60.0, 
+                                        persistent_lines=True)
                 print(f"Right waypoint: {(right_wp.transform.location.x, right_wp.transform.location.y, right_wp.transform.location.z) if right_wp else 'None'}")
 
         real_points = []
@@ -562,19 +570,19 @@ class D_star(object):
                 self.tag[self.state_space.id] = 'Closed'
 
 
-            self.Path = self.path(self.state_space)
-            print("Path found!")
-            self.visualize_path(self.Path)
+                self.Path = self.path(self.state_space)
+                print("Path found!")
+                self.visualize_path(self.Path)
 
-            # Execute path with safety checks
-            for waypoint in self.Path:
-                if not self.detect_obstacles(waypoint):  # Safety check
-                    self.move_vehicle(waypoint)
-                else:
-                    print("Obstacle detected during execution, replanning needed")
-                    return self.run()  # Recursive replanning
+                # Execute path with safety checks
+                for waypoint in self.Path:
+                    if not self.detect_obstacles(waypoint):  # Safety check
+                        self.move_vehicle(waypoint)
+                    else:
+                        print("Obstacle detected during execution, replanning needed")
+                        return self.run()  # Recursive replanning
 
-            return self.Path
+                return self.Path
 
         except Exception as e:
             print(f"Error during path planning: {e}")
@@ -627,7 +635,6 @@ if __name__ == '__main__':
     point_b = random.choice(spawn_points)
     if point_b.location == point_a.location:
         point_b = random.choice(spawn_points)
-
     start_waypoint = carla_map.get_waypoint(point_a.location)
     print(f"Start waypoint: {start_waypoint}")
 
