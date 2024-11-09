@@ -17,17 +17,11 @@ class D_star(object):
         self.obstacle_threshold = 3.0
         self.b = {}
         self.OPEN = []
-        
         self.tag = {}
         self.V = set()
-        self.parameters = ()
-        self.ind = 0
         self.Path = []
-        #self.hold_wps = []
-        self.done = False
+        self.hold_wps = []
         self.Obstaclemap = {}
-
-        #1. Should world map and stuff be in init
         self.world = world
         self.map = world.get_map()
         self.vehicle = vehicle
@@ -45,19 +39,17 @@ class D_star(object):
         self.xt = end_waypoint
         print(f'end_waypoint: {self.xt.transform.location}')
     
-    
-    #this function is good 
     def populate_open(self, state):
         print(f"PO state: {state}")
-        '''
+        
         if self.next_waypoint:
             child_waypoints = [self.next_waypoint]
             self.next_waypoint = None
         else:
             print("No stored next_waypoint")
             child_waypoints = self.children(state)
-        '''
-        child_waypoints = self.children(state)
+        
+        #child_waypoints = self.children(state)
         print(f"Child waypoint locations: {[wp.transform.location for wp in child_waypoints]}")
 
         for child in child_waypoints:
@@ -95,6 +87,14 @@ class D_star(object):
         print(f"Final OPEN queue size: {'empty' if self.OPEN == [] else 'not empty'}")
         print(f"Visited set V size: {len(self.V)}")
        
+        for i in range(len(self.OPEN)):
+            location = self.OPEN[i][1].transform.location
+            self.world.debug.draw_string(location, f'init:{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
+
+            if i < len(self.OPEN) - 1:
+                next_location = self.OPEN[i + 1][1].transform.location
+                self.world.debug.draw_line(location, next_location, thickness=0.1, color=carla.Color(r=255, g=255, b=0), life_time=60.0, persistent_lines=True)
+
         return self.OPEN
 
     
@@ -333,49 +333,23 @@ class D_star(object):
             self.insert(cost_value, state)
 
     #repair_replan, check
-    def modify(self, state):
-        #print(f'modify: state_space: {state_space}')
-        self.modify_cost(state)
-        kmin = self.get_kmin()
-        #this could be causing the inf loop because if kmin is never updates it is always greater than h
-        while kmin is not None and kmin < self.h[state.id]:          
-            kmin, y = self.process_state()
-            print(f'process_state returned kmin: {kmin}')
-            if kmin is None or kmin >= self.h[state.id] or kmin == -1:
-                return -1 
-        
-        self.Path(y)
-
     def children(self, state):
-        print(f"Initial state: {state}")
-        
         children = []
         if state is None:
-            print("State is None, returning empty children list")
             return children
 
         next_waypoint = state.next(2.0)
-        print(f"Next waypoints: {[(wp.transform.location.x, wp.transform.location.y, wp.transform.location.z) for wp in next_waypoint]}")
-        
         if next_waypoint:
-            print(f"Adding {len(next_waypoint)} next waypoints to children")
             children.extend(next_waypoint)
 
         if state.lane_change & carla.LaneChange.Left:
             left_wp = state.get_left_lane()
-            print(f"Left_wp: {left_wp}")
-            
             if left_wp and left_wp.lane_type == carla.LaneType.Driving:
-                print(f"Adding left waypoint: {left_wp.transform.location}")
                 children.append(left_wp)
-                print(f"Left waypoint: {(left_wp.transform.location.x, left_wp.transform.location.y, left_wp.transform.location.z) if left_wp else 'None'}")
 
         if state.lane_change & carla.LaneChange.Right:
             right_wp = state.get_right_lane()
-            print(f"Right wp: {right_wp}")
-            
             if right_wp and right_wp.lane_type == carla.LaneType.Driving:
-                print(f"Adding right waypoint: {right_wp.transform.location}")
                 children.append(right_wp)
 
         real_points = []
@@ -402,14 +376,14 @@ class D_star(object):
                 children[i] = best_waypoint
 
         print(f"Final children locations: [{[(c.transform.location.x, c.transform.location.y, c.transform.location.z) for c in children]}]")
-
-        # Include draw_string here for all waypoints
+        
+        '''
         for i in children: 
             print(f"Drawing waypoint at: ({i.transform.location.x}, {i.transform.location.y}, {i.transform.location.z})")
             self.world.debug.draw_string(i.transform.location, '0', draw_shadow=False, 
                                         color=carla.Color(r=220, g=0, b=0), life_time=60.0, 
                                         persistent_lines=True)
-        
+        '''
         return children
 
     #backpointer list 
@@ -553,7 +527,7 @@ class D_star(object):
                 h_value = 0
 
             key = cost + h_value
-            self.OPEN.put((key, self.state_space)) 
+            self.OPEN.append((key, self.state_space)) 
    
             self.populate_open(self.x0)
 
