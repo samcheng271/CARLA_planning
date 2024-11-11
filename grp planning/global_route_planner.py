@@ -39,13 +39,14 @@ class GlobalRoutePlanner(object):
         self._find_loose_ends()
         self._lane_change_link()
 
-    def trace_route(self, origin, destination):
+    def trace_route(self, origin, destination, world, new_obstacle=None):
         """
         This method returns list of (carla.Waypoint, RoadOption)
         from origin to destination
         """
+        # New parameter: new_obstacle. This feeds the obstacle into the A*.
         route_trace = []
-        route = self._path_search(origin, destination)
+        route = self._path_search(origin, destination, world, new_obstacle)
 
         current_waypoint = self._wmap.get_waypoint(origin)
         destination_waypoint = self._wmap.get_waypoint(destination)
@@ -53,8 +54,10 @@ class GlobalRoutePlanner(object):
         for i in range(len(route) - 1):
             road_option = self._turn_decision(i, route)
             edge = self._graph.edges[route[i], route[i+1]]
+            # print (current_waypoint, edge, road_option)
             path = []
 
+            # print (current_waypoint)
             if edge['type'] != RoadOption.LANEFOLLOW and edge['type'] != RoadOption.VOID:
                 route_trace.append((current_waypoint, road_option))
                 exit_wp = edge['exit_waypoint']
@@ -288,7 +291,7 @@ class GlobalRoutePlanner(object):
         l2 = np.array(self._graph.nodes[n2]['vertex'])
         return np.linalg.norm(l1-l2)
 
-    def _path_search(self, origin, destination):
+    def _path_search(self, origin, destination, world, new_obstacle=None):
         """
         This function finds the shortest path connecting origin and destination
         using A* search with distance heuristic.
@@ -297,19 +300,38 @@ class GlobalRoutePlanner(object):
         return      :   path as list of node ids (as int) of the graph self._graph
         connecting origin and destination
         """
+        # New parameter: new_obstacle. This feeds the obstacle into the A*.
 
         origin_waypoint = self._wmap.get_waypoint(origin)
         destination_waypoint = self._wmap.get_waypoint(destination)
 
         start, end = self._localize(origin), self._localize(destination)
 
-        route = a_star(origin_waypoint, destination_waypoint)
+        route = a_star(origin_waypoint, destination_waypoint, new_obstacle)
+
+        i = 0
+        for w in route:
+            # print(w[0].transform.location.x, ",",w[0].transform.location.y, w[1])
+            if i % 10 == 0:
+                world.debug.draw_string(w.transform.location, 'f{i}', draw_shadow=False,
+                color=carla.Color(r=255, g=0, b=0), life_time=120.0,
+                persistent_lines=True)
+            else:
+                world.debug.draw_string(w.transform.location, 'f{i}', draw_shadow=False,
+                color = carla.Color(r=0, g=0, b=255), life_time=60.0,
+                persistent_lines=True)
+            i += 1
 
         localized_route = [self._localize(waypoint.transform.location) for waypoint in route]
+
+        # for waypoint in route:
+        #     print (waypoint.transform.location, self._localize(waypoint.transform.location))
+        # print (localized_route)
 
         edge_route = {}
 
         for edge in localized_route:
+            print (edge)
             edge_route[edge[0]] = edge[1]
 
         current_start = self._localize(route[0].transform.location)[0]
