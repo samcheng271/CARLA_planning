@@ -15,6 +15,7 @@ amap = world.get_map()
 
 blueprint_library = world.get_blueprint_library()
 vehicle_bp = random.choice(blueprint_library.filter('vehicle.*.*')) #vehicle blueprint
+vehicle_bp_2 = random.choice(blueprint_library.filter('vehicle.*.*')) #vehicle blueprint
 
 sampling_resolution = 2
 # dao = GlobalRoutePlannerDAO(amap, sampling_resolution)
@@ -22,12 +23,19 @@ grp = GlobalRoutePlanner(amap, sampling_resolution)
 # grp.setup()
 spawn_points = world.get_map().get_spawn_points()
 # print(spawn_points)
-point_a = carla.Location(spawn_points[50].location)
+point_a_spawn = spawn_points[50]
+point_a = carla.Location(point_a_spawn.location)
 point_b = carla.Location(spawn_points[100].location)
+point_c_spawn = carla.Transform(carla.Location(point_a.x - 20, point_a.y, point_a.z), point_a_spawn.rotation)
+point_c_waypoint = amap.get_waypoint(carla.Location(point_a.x - 20, point_a.y, point_a.z))
 
-print(spawn_points[50].location)
+print(point_c_spawn)
 
-w1 = grp.trace_route(point_a, point_b) # there are other funcations can be used to generate a route in GlobalRoutePlanner.
+print(spawn_points[50])
+
+print(world)
+
+w1 = grp.trace_route(point_a, point_b, world) # there are other funcations can be used to generate a route in GlobalRoutePlanner.
     # print (spawn_points[50].location)
     # print (spawn_points[100].location)
     # print(spawn_points[100].location.x - spawn_points[50].location.x)
@@ -47,9 +55,13 @@ w1 = grp.trace_route(point_a, point_b) # there are other funcations can be used 
 
 i = 0
 try:
-    vehicle = world.spawn_actor(vehicle_bp, spawn_points[50]) #spawning a random vehicle
+    vehicle = world.spawn_actor(vehicle_bp, point_a_spawn) #spawning a random vehicle
+    vehicle_2 = world.spawn_actor(vehicle_bp_2, point_c_spawn) #spawning a random vehicle
     agent = BasicAgent(vehicle) # Creating a vehicle for agent
     agent.set_destination(point_b) #Set Location Destination
+
+    # print(vehicle.get_location().x, ",", vehicle.get_location().y, point_a_spawn)
+    # print(vehicle_2.get_location().x, ",", vehicle.get_location().y, point_c_spawn)
 
     i = 0
     while True:
@@ -63,3 +75,4 @@ try:
 
 finally:
     destroyed_sucessfully = vehicle.destroy()
+    destroyed_sucessfully = vehicle_2.destroy()
