@@ -75,6 +75,7 @@ def a_star(start_waypoint, end_waypoint, new_obstacle=None, heuristic_func=eucli
             while current_node:
                 path.append(current_node.waypoint)
                 current_node = came_from.get(current_node.waypoint.id)
+            print (f_score)
             return list(reversed(path))
         
         # Unlikely to happen. left here for debugging purposes
@@ -94,11 +95,12 @@ def a_star(start_waypoint, end_waypoint, new_obstacle=None, heuristic_func=eucli
             # Therefore, this is g_score and not f_score
             tentative_g_score = g_score[current_node.waypoint.id] + euclidean_heuristic(current_node.waypoint, next_waypoint) + lane_change_cost
 
-            if _near_obstacle(next_waypoint, obstacles):
+            #Distance to determine how far obstacles are
+            if _near_obstacle(next_waypoint, obstacles, 4.0):
                 tentative_g_score = float('inf')
             # If the next waypoint is already in the open set, we can skip it
             # Comparing g_score for the reason above tentative_g_score.
-            if next_waypoint.id not in g_score or tentative_g_score < g_score[next_waypoint.id]:
+            if next_waypoint.id not in g_score or tentative_g_score < g_score[next_waypoint.id] or tentative_g_score == float('inf'):
                 # Draws the possible routes A* checked
                 # world.debug.draw_string(next_waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=0, g=220, b=0), life_time=25.0, persistent_lines=True)
                 

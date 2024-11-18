@@ -232,7 +232,7 @@ class BasicAgent(object):
 
         # Check for possible vehicle obstacles
         max_vehicle_distance = self._base_vehicle_threshold + self._speed_ratio * vehicle_speed
-        affected_by_vehicle, _, _, obstacle_wpt = self._vehicle_obstacle_detected(vehicle_list, max_vehicle_distance)
+        affected_by_vehicle, _, _, obstacle_wpt = self._vehicle_obstacle_detected(vehicle_list, 18)
         if affected_by_vehicle:
             hazard_obstacle = True
 
@@ -243,13 +243,17 @@ class BasicAgent(object):
             hazard_light = True
 
         control = self._local_planner.run_step()
-        if hazard_obstacle and not hazard_light:
+        # if hazard_obstacle and not hazard_light:
+        if hazard_obstacle:
             # if self._previous_obstacle != obstacle_wpt:
             if self._previous_obstacle == None or self._previous_obstacle.transform.location.distance(obstacle_wpt.transform.location) > 0.5:
                 print ("Replanning around obstacle: ", obstacle_wpt.transform.location)
                 control = self.add_emergency_stop(control)
                 self._previous_obstacle = obstacle_wpt
                 self.set_destination(self._destination, None, obstacle_wpt)
+                self._world.debug.draw_string(obstacle_wpt.transform.location, 'Obstacle', draw_shadow=False,
+                color=carla.Color(r=255, g=0, b=0), life_time=30.0,
+                persistent_lines=True)
             else:
                 print ("Replanning for previous obstacle")
                 control = self.add_emergency_stop(control)

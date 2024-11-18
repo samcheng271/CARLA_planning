@@ -313,12 +313,14 @@ class GlobalRoutePlanner(object):
         for w in route:
             # print(w[0].transform.location.x, ",",w[0].transform.location.y, w[1])
             if i % 10 == 0:
-                world.debug.draw_string(w.transform.location, 'f{i}', draw_shadow=False,
-                color=carla.Color(r=255, g=0, b=0), life_time=120.0,
+                # print(w.transform.location)
+                world.debug.draw_string(w.transform.location, f'{i}', draw_shadow=False,
+                color=carla.Color(r=255, g=0, b=0), life_time=30.0,
                 persistent_lines=True)
             else:
-                world.debug.draw_string(w.transform.location, 'f{i}', draw_shadow=False,
-                color = carla.Color(r=0, g=0, b=255), life_time=60.0,
+                # print(w.transform.location)
+                world.debug.draw_string(w.transform.location, f'{i}', draw_shadow=False,
+                color = carla.Color(r=0, g=0, b=255), life_time=30.0,
                 persistent_lines=True)
             i += 1
 
