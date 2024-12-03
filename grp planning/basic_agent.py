@@ -63,6 +63,8 @@ class BasicAgent(object):
         self._speed_ratio = 1
         self._max_brake = 0.5
         self._offset = 0
+        self._destination = None
+        self._previous_obstacle = None
 
         # Change parameters according to the dictionary
         opt_dict['target_speed'] = target_speed
@@ -138,7 +140,7 @@ class BasicAgent(object):
         """Get method for protected member local planner"""
         return self._global_planner
 
-    def set_destination(self, end_location, start_location=None):
+    def set_destination(self, end_location, start_location=None, new_obstacle=None):
         """
         This method creates a list of waypoints between a starting and ending location,
         based on the route returned by the global router, and adds it to the local planner.
@@ -148,6 +150,15 @@ class BasicAgent(object):
             :param end_location (carla.Location): final location of the route
             :param start_location (carla.Location): starting location of the route
         """
+        # New parameter: new_obstacle. The current plan is to call set_destination in the event
+        # of a detected obstacle, so thus we can feed that obstacle towards the algorithm
+        # and appropriately replan. 
+        # In normal usage, its value being None ensures that normal operation of the function
+        # is sustained. Further, there was a key decision that the agent class is not holding
+        # the obstacles as information but just passes it on to the algorthim, such that it can
+        # be simulated that the algorithm is working with a new iteration of the map its developing
+        # an algorithm on.
+
         if not start_location:
             start_location = self._local_planner.target_waypoint.transform.location
             clean_queue = True
@@ -157,22 +168,23 @@ class BasicAgent(object):
 
         start_waypoint = self._map.get_waypoint(start_location)
         end_waypoint = self._map.get_waypoint(end_location)
-        self._destination = end_waypoint
+        self._destination = end_location
 
-        route_trace = self.trace_route(start_waypoint, end_waypoint)
+        
+        route_trace = self.trace_route(start_waypoint, end_waypoint, new_obstacle)
 
-        i = 0
-        for w in route_trace:
-            # print(w[0].transform.location.x, ",",w[0].transform.location.y, w[1])
-            if i % 10 == 0:
-                self._world.debug.draw_string(w[0].transform.location, 'O', draw_shadow=False,
-                color=carla.Color(r=255, g=0, b=0), life_time=120.0,
-                persistent_lines=True)
-            else:
-                self._world.debug.draw_string(w[0].transform.location, 'O', draw_shadow=False,
-                color = carla.Color(r=0, g=0, b=255), life_time=1000.0,
-                persistent_lines=True)
-            i += 1
+        # i = 0
+        # for w in route_trace:
+        #     # print(w[0].transform.location.x, ",",w[0].transform.location.y, w[1])
+        #     if i % 10 == 0:
+        #         self._world.debug.draw_string(w[0].transform.location, 'f{i}', draw_shadow=False,
+        #         color=carla.Color(r=255, g=0, b=0), life_time=120.0,
+        #         persistent_lines=True)
+        #     else:
+        #         self._world.debug.draw_string(w[0].transform.location, 'f{i}', draw_shadow=False,
+        #         color = carla.Color(r=0, g=0, b=255), life_time=60.0,
+        #         persistent_lines=True)
+        #     i += 1
         self._local_planner.set_global_plan(route_trace, clean_queue=clean_queue)
 
     def set_global_plan(self, plan, stop_waypoint_creation=True, clean_queue=True):
@@ -189,20 +201,29 @@ class BasicAgent(object):
             clean_queue=clean_queue
         )
 
-    def trace_route(self, start_waypoint, end_waypoint):
+    def trace_route(self, start_waypoint, end_waypoint, new_obstacle=None):
         """
         Calculates the shortest route between a starting and ending waypoint.
 
             :param start_waypoint (carla.Waypoint): initial waypoint
             :param end_waypoint (carla.Waypoint): final waypoint
         """
+        # New parameter: new_obstacle. This feeds the obstacle into the grp.
+
         start_location = start_waypoint.transform.location
         end_location = end_waypoint.transform.location
-        return self._global_planner.trace_route(start_location, end_location)
+
+        return self._global_planner.trace_route(start_location, end_location, self._world, new_obstacle)
 
     def run_step(self):
         """Execute one step of navigation."""
-        hazard_detected = False
+        # Two hazard detection booleans to avoid replanning just for the sake of
+        # avoiding a light. Though problem is the consideration if the vehicle
+        # classified as obstacle is part of light.
+        # For now, since vehicles are obstacles, I think its fine to have them be
+        # assigned as hazards, until we have proper obstaclrd.
+        hazard_obstacle = False
+        hazard_light = False
 
         # Retrieve all relevant actors
         vehicle_list = self._world.get_actors().filter("*vehicle*")
@@ -211,19 +232,34 @@ class BasicAgent(object):
 
         # Check for possible vehicle obstacles
         max_vehicle_distance = self._base_vehicle_threshold + self._speed_ratio * vehicle_speed
-        affected_by_vehicle, _, _ = self._vehicle_obstacle_detected(vehicle_list, max_vehicle_distance)
+        affected_by_vehicle, _, _, obstacle_wpt = self._vehicle_obstacle_detected(vehicle_list, 18)
         if affected_by_vehicle:
-            hazard_detected = True
+            hazard_obstacle = True
 
         # Check if the vehicle is affected by a red traffic light
         max_tlight_distance = self._base_tlight_threshold + self._speed_ratio * vehicle_speed
         affected_by_tlight, _ = self._affected_by_traffic_light(self._lights_list, max_tlight_distance)
         if affected_by_tlight:
-            hazard_detected = True
+            hazard_light = True
 
         control = self._local_planner.run_step()
-        if hazard_detected:
+        # if hazard_obstacle and not hazard_light:
+        if hazard_obstacle:
+            # if self._previous_obstacle != obstacle_wpt:
+            if self._previous_obstacle == None or self._previous_obstacle.transform.location.distance(obstacle_wpt.transform.location) > 0.5:
+                print ("Replanning around obstacle: ", obstacle_wpt.transform.location)
+                control = self.add_emergency_stop(control)
+                self._previous_obstacle = obstacle_wpt
+                self.set_destination(self._destination, None, obstacle_wpt)
+                self._world.debug.draw_string(obstacle_wpt.transform.location, 'Obstacle', draw_shadow=False,
+                color=carla.Color(r=255, g=0, b=0), life_time=30.0,
+                persistent_lines=True)
+            else:
+                print ("Replanning for previous obstacle")
+                control = self.add_emergency_stop(control)
+        elif hazard_obstacle and hazard_light:
             control = self.add_emergency_stop(control)
+
 
         return control
 
@@ -356,12 +392,12 @@ class BasicAgent(object):
 
             # Two points don't create a polygon, nothing to check
             if len(route_bb) < 3:
-                return None
+                return None, None, None, None
 
             return Polygon(route_bb)
 
         if self._ignore_vehicles:
-            return (False, None, -1)
+            return (False, None, -1, None)
 
         if not vehicle_list:
             vehicle_list = self._world.get_actors().filter("*vehicle*")
@@ -407,7 +443,7 @@ class BasicAgent(object):
                 target_polygon = Polygon(target_list)
 
                 if route_polygon.intersects(target_polygon):
-                    return (True, target_vehicle, compute_distance(target_vehicle.get_location(), ego_location))
+                    return (True, target_vehicle, compute_distance(target_vehicle.get_location(), ego_location), target_wpt)
 
             # Simplified approach, using only the plan waypoints (similar to TM)
             else:
@@ -426,11 +462,13 @@ class BasicAgent(object):
                     x=target_extent * target_forward_vector.x,
                     y=target_extent * target_forward_vector.y,
                 )
+                # Send in a list of waypoints to the obstacle. Or lane.id comparison to an obstacle within a certain distance.
+                # Not sure which implementation will work out.
 
                 if is_within_distance(target_rear_transform, ego_front_transform, max_distance, [low_angle_th, up_angle_th]):
-                    return (True, target_vehicle, compute_distance(target_transform.location, ego_transform.location))
+                    return (True, target_vehicle, compute_distance(target_transform.location, ego_transform.location), target_wpt)
 
-        return (False, None, -1)
+        return (False, None, -1, None)
 
     def _generate_lane_change_path(self, waypoint, direction='left', distance_same_lane=10,
                                 distance_other_lane=25, lane_change_distance=25,
