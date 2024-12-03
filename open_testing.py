@@ -58,6 +58,7 @@ class D_star(object):
             h_value = self.store_h(child)
             key = cost + h_value
             existing_items = next((key for key, wp in self.OPEN if wp == child), None)
+
             if not existing_items:
                 self.OPEN.append((key, child))
                 self.OPEN.sort(key=lambda x: x[0])
@@ -65,7 +66,6 @@ class D_star(object):
                 self.V.add(child)
             else:
                 next_waypoints = self.children(child)
-
                 if next_waypoints:
                     self.next_waypoint = next_waypoints[0]
                     print(f"Stored new next_waypoint: {self.next_waypoint.transform.location}")
@@ -105,7 +105,6 @@ class D_star(object):
     def store_h(self, state):
         
         #Euclidean distance between 3D points
-
         #:param location_1, location_2: 3D points
         if state is None:
             return float('inf')
@@ -160,12 +159,13 @@ class D_star(object):
         self.OPEN.append((kx, state)) 
         print(f'Inserted state {state} with key {kx}')
 
-    def process_state(self):
-        x = self.min_state()
-        kold = self.get_kmin()
-        print(f'process state: kold: {kold}, statex: {x}')
 
-        if x is None: 
+    def process_state(self):
+        currState = self.min_state()
+        kold = self.get_kmin()
+        print(f'process state: kold: {kold}, statex: {currState}')
+
+        if currState is None: 
             return -1
         
         '''
@@ -179,10 +179,11 @@ class D_star(object):
             print(f"Skipping already processed waypoint: {x.transform.location}")
         """
             
-        self.store_h(x)
-        print(f'x: {x}, kold: {kold}')
-        if x.id not in self.V: 
-            for y in self.children(x):
+        self.store_h(currState)
+        print(f'x: {currState}, kold: {kold}')
+        if currState.id not in self.V: 
+            '''
+            for y in self.children(currState):
                 self.store_h(y)
                 if y.id not in self.tag:
                     self.tag[y.id] = 'New'
@@ -192,80 +193,79 @@ class D_star(object):
                     print(f"Using existing cost for {y}: {existing_cost}")
                     cost = existing_cost
                 else:
-                    cost = self.cost(x, y)
+                    cost = self.cost(currState, y)
             
-                h_new = self.h[x.id] + cost
+                h_new = self.h[currState.id] + cost
                 if h_new < self.h[y.id]: 
                     self.h[y.id] = h_new
-                    self.dictofParents[y.id] = x
+                    self.dictofParents[y.id] = currState
                     print(f"self.dictofParents[y.id]: {self.dictofParents[y.id]}")
                     self.insert(h_new, y)
-                
-            if kold < self.h[x.id]:  # raised states
-                print(f'kold < h[x.id]: {kold} < {self.h[x.id]}')
-                for y in self.children(x):
+                '''
+            if kold < self.h[currState.id]:  # raised states
+                print(f'kold < h[x.id]: {kold} < {self.h[currState.id]}')
+                for y in self.children(currState):
                     existing_cost = next((key for key, wp in self.OPEN if wp == y), None)
-            
                     if existing_cost is not None:
                         print(f"Using existing cost for {y}: {existing_cost}")
                         cost = existing_cost
                     else:
-                        cost = self.cost(x, y)
+                        cost = self.cost(currState, y)
             
-                    heuristic_a = self.h[x.id] + cost
+                    heuristic_a = self.h[currState.id] + cost
                     print(f'heuristic_a: {heuristic_a}')
-                    print(f"process state: cost(y, x) = {self.cost(y, x)}")
-                    if self.h[y.id] <= kold and self.h[x.id] > heuristic_a:
-                        self.dictofParents[x.id] = y
-                        print(f"self.dictofParents[x.id]: {self.dictofParents[x.id]}")
-                        self.h[x.id] = heuristic_a
+                    print(f"process state: cost(y, x) = {self.cost(y, currState)}")
+                    self.dictofParents[y.id] = currState
+                    if self.h[y.id] <= kold and self.h[currState.id] > heuristic_a:
+                        self.dictofParents[currState.id] = y
+                        print(f"self.dictofParents[x.id]: {self.dictofParents[currState.id]}")
+                        self.h[currState.id] = heuristic_a
 
-            if kold == self.h[x.id]:  # lower states 
-                print(f'kold == h[x.id]: {kold} == {self.h[x.id]}')
-                self.tag[x.id] = 'Closed'
-                self.V.add(x)
-                for y in self.children(x):
+            if kold == self.h[currState.id]:  # lower states 
+                print(f'kold == h[x.id]: {kold} == {self.h[currState.id]}')
+                self.tag[currState.id] = 'Closed'
+                self.V.add(currState)
+                for y in self.children(currState):
                     existing_cost = next((key for key, wp in self.OPEN if wp == y), None)
             
                     if existing_cost is not None:
                         print(f"Using existing cost for {y}: {existing_cost}")
                         cost = existing_cost
                     else:
-                        cost = self.cost(x, y)
+                        cost = self.cost(currState, y)
             
-                    bb = self.h[x.id] + cost
-                    if self.tag[y.id] == 'New' or \
-                            (self.dictofParents[y.id] == x and self.h[y.id] != bb) or \
-                            (self.dictofParents[y.id] != x and self.h[y.id] > bb):
+                    bb = self.h[currState.id] + cost
+                    self.dictofParents[y.id] = currState
+                    if self.tag[y.id] == 'New' or (self.dictofParents[y.id] == currState and self.h[y.id] != bb) or \
+                            (self.dictofParents[y.id] != currState and self.h[y.id] > bb):
                         print(f'Insert y: {y} with bb: {bb}')
-                        self.dictofParents[y.id] = x
-                        print(f"ls, x.id: {x.id}")
+                        self.dictofParents[y.id] = currState
+                        print(f"ls, x.id: {currState.id}")
                         print(f"self.dictofParents[y.id]: {self.dictofParents[y.id]}")
                         self.insert(bb, y)
             else:
-                print(f'kold != h[x.id]: {kold} != {self.h[x.id]}')
-                for y in self.children(x):
+                print(f'kold != h[x.id]: {kold} != {self.h[currState.id]}')
+                for y in self.children(currState):
                     existing_cost = next((key for key, wp in self.OPEN if wp == y), None)
                     
                     if existing_cost is not None:
                         print(f"Using existing cost for {y}: {existing_cost}")
                         cost = existing_cost
                     else:
-                        cost = self.cost(x, y)
-                    
-                    bb = self.h[x.id] + cost
+                        cost = self.cost(currState, y)
+                    bb = self.h[currState.id] + cost
                     print(f'bb: {bb}')
-                    
                     if y.id not in self.tag:
                         self.tag[y.id] = 'New'
+                    print(f"self.tag[y.id]: {self.tag[y.id]}")
                     print(f"y: {y}")
                     print(f"y.id: {y.id}")
-                    print(f"self.dictofParents: {self.dictofParents[y.id]}")
+                    #self.dictofParents[y.id] = currState
+                    #print(f"self.dictofParents: {self.dictofParents[y.id]}")
                     print(f"self.h: {self.h[y.id]}")
-                    if self.tag[y.id] == 'New' or \
-                        (self.dictofParents[y.id] == x and self.h[y.id] != bb):
-                        self.dictofParents[y.id] = x
-                        print(f"else, x: {x.id}")
+                    if self.tag[y.id] == 'New' or (self.dictofParents[y.id] == currState and self.h[y.id] != bb):
+                        self.dictofParents[y.id] = currState
+                        print(f"else, x: {currState.id}")
                         self.insert(bb, y)
         return self.min_state()
     
@@ -348,6 +348,30 @@ class D_star(object):
             search_state = next_state
 
         print(f"Path found: {Path}")
+
+        for i in range(len(Path) - 1):
+            curr_state = Path[i]
+            next_state = Path[i + 1]
+
+            self.world.debug.draw_line(
+                curr_state.transform.location,
+                next_state.transform.location,
+                thickness=0.2, 
+                color=carla.Color(255, 0, 0), 
+                life_time=10.0 
+            )
+            self.world.debug.draw_point(
+                curr_state.transform.location,
+                size=0.1,
+                color=carla.Color(0, 255, 0), 
+                life_time=10.0
+            )
+            self.world.debug.draw_point(
+                Path[-1].transform.location,
+                size=0.1,
+                color=carla.Color(0, 255, 0),
+                life_time=10.0
+            )
 
         return Path
 
