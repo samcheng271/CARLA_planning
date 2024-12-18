@@ -277,13 +277,11 @@ class D_star(object):
         #print(f'modify: state_space: {state_space}')
         self.modify_cost(state)
         kmin = self.get_kmin()
-        #this could be causing the inf loop because if kmin is never updates it is always greater than h
         while kmin is not None and kmin < self.h[state.id]:          
             kmin = self.process_state()
             print(f'process_state returned kmin: {kmin}')
             if kmin is None or kmin >= self.h[state.id] or kmin == -1:
                 return -1 
-        
         self.Path()
     
 
@@ -402,7 +400,6 @@ class D_star(object):
             #trace_location = np.array([trace_state.transform.location.x, trace_state.transform.location.y, trace_state.transform.location.z])
             #parent_location = np.array([x.transform.location.x, x.transform.location.y, x.transform.location.z])
             self.Path.append(x)
-
             #trace_state = x
             print(f"path append: {x}")
         if x != self.xt:
