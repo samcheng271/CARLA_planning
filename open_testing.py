@@ -109,9 +109,13 @@ class D_star(object):
 
         self.tag[state.id] = 'Open'
         self.OPEN.append((kx, state)) 
-        draw_OPEN = [self.waypoints[i].location for i in self.OPEN]
-        for i in draw_OPEN:
-            world.debug.draw_string(self.waypoints[i].location, str(i), life_time=60, color=carla.Color(255, 0, 0))
+        for i in range(len(self.OPEN)):
+            location = self.OPEN[i][1].transform.location
+            self.world.debug.draw_string(location, f'{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
+
+        if i < len(self.OPEN) - 1:
+            next_location = self.OPEN[i + 1][1].transform.location
+            self.world.debug.draw_line(location, next_location, thickness=0.1, color=carla.Color(r=255, g=255, b=0), life_time=60.0, persistent_lines=True)
         print(f'Inserted state {state} with key {kx}')
     
     def populate_open(self, state):
@@ -154,7 +158,7 @@ class D_star(object):
        
         for i in range(len(self.OPEN)):
             location = self.OPEN[i][1].transform.location
-            self.world.debug.draw_string(location, f'init:{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
+            self.world.debug.draw_string(location, f'{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
 
             if i < len(self.OPEN) - 1:
                 next_location = self.OPEN[i + 1][1].transform.location
@@ -162,16 +166,15 @@ class D_star(object):
 
         return self.OPEN
      
-
     def process_state(self):
-        #1. Make sure the values are assigned proper string values before entering insert
-        #2. Make sure heuristics are inserted properly
         currState = self.min_state()
         kold = self.get_kmin()
-        print(f'process state: kold: {kold}, statex: {currState}')
+        print(f' kold: {kold}, statex: {currState}')
         if currState is None: 
             return -1
-        self.store_h(currState)
+        #kold= heuristic + cost
+        #self.h[currState.id]= only heuristic, for this reason kold will always be greater than h(currState) and first two conditions are never met 
+       #self.store_h(currState)
         print(f"before loop, h dict: {self.h[currState.id]}")
         if currState.id not in self.V: 
             if kold < self.h[currState.id]:  # raised states
@@ -190,12 +193,8 @@ class D_star(object):
                 self.tag[currState.id] = 'Closed'
                 self.V.add(currState)
                 for y in self.children(currState):
-                    existing_cost = next((key for key, wp in self.OPEN if wp == y), None)
-                    if existing_cost is not None:
-                        print(f"Using existing cost for {y}: {existing_cost}")
-                        cost = existing_cost
-                    else:
-                       cost = self.cost(currState, y)
+                    self.store_h(y)
+                    cost = self.cost(currState, y)
                     bb = self.h[currState.id] + cost
                     self.dictofParents[y.id] = currState
                     if self.tag[y.id] == 'New' or (self.dictofParents[y.id] == currState and self.h[y.id] != bb) or \
@@ -206,27 +205,24 @@ class D_star(object):
                         print(f"self.dictofParents[y.id]: {self.dictofParents[y.id]}")
                         self.insert(bb, y)
             else:
-                print(f'kold != h[x.id]: {kold} != {self.h[currState.id]}')
+                print(f'kold >h[x.id]: {kold} >{self.h[currState.id]}')
+                #1. check what values are getting inserted from insert to min state bc that is ht ecurrent state in run that modify cant find 
+                #2. States are not correctly inserted into OPEN, it is inserting the current state instead of it's neighbors 
                 for y in self.children(currState):
-                    existing_cost = next((key for key, wp in self.OPEN if wp == y), None)
                     self.store_h(y)
-                    if existing_cost is not None:
-                        print(f"Using existing cost for {y}: {existing_cost}")
-                        cost = existing_cost
-                    else:
-                        cost = self.cost(currState, y)
-                    bb = self.h[currState.id] + cost
+                    cost = self.cost(currState, y)
+                    bb = self.h[y.id] + cost
                     print(f'bb: {bb}')
                     if y.id not in self.tag:
-                        self.tag[y.id] = 'New'
-                    print("check 1")
+                        self.tag[y.id] = 'New' 
                     if self.tag[y.id] == 'New' or (self.dictofParents[y.id] == currState and self.h[y.id] != bb):
                         self.dictofParents[y.id] = currState
-                        print(f"else, x: {currState.id}")
+                        print(f"dictofParents: {self.dictofParents}")
                         self.insert(bb, y)
         return self.min_state()
     
     def modify_cost(self, state):
+        #state is not in dictofParents
         x_parent = self.dictofParents[state.id]
         print(f'xparent: {x_parent}')
         if self.tag[state.id] == 'Closed':
@@ -241,6 +237,13 @@ class D_star(object):
         #this could be causing the inf loop because if kmin is never updates it is always greater than h
         while kmin is not None and kmin < self.h[state.id]:          
             kmin = self.process_state()
+            for i in range(len(self.OPEN)):
+                location = self.OPEN[i][1].transform.location
+                self.world.debug.draw_string(location, f'{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
+
+            if i < len(self.OPEN) - 1:
+                next_location = self.OPEN[i -1][1].transform.location
+                self.world.debug.draw_line(location, next_location, thickness=0.1, color=carla.Color(r=255, g=255, b=0), life_time=60.0, persistent_lines=True)
             print(f'process_state returned kmin: {kmin}')
             if kmin is None or kmin >= self.h[state.id] or kmin == -1:
                 return -1 
@@ -283,18 +286,14 @@ class D_star(object):
                         print(f"Updated best waypoint: ({best_waypoint.transform.location.x}, {best_waypoint.transform.location.y}, {best_waypoint.transform.location.z})")
                 children[i] = best_waypoint
         
-        print(f"Final children locations: [{[(c.transform.location.x, c.transform.location.y, c.transform.location.z) for c in children]}]")
-        draw_child = [self.waypoints[i].location for i in children]
-        for i in draw_child:
-            world.debug.draw_string(self.waypoints[i].location, str(i), life_time=60, color=carla.Color(255, 0, 0))
-
-        """
+        print(f"Child list: [{[(c.transform.location.x, c.transform.location.y, c.transform.location.z) for c in children]}]")
+        
+        
         for i in children: 
             print(f"Drawing waypoint at: ({i.transform.location.x}, {i.transform.location.y}, {i.transform.location.z})")
             self.world.debug.draw_string(i.transform.location, '0', draw_shadow=False, 
                                         color=carla.Color(r=220, g=0, b=0), life_time=60.0, 
                                         persistent_lines=True)
-        """
         return children
 
     #backpointer list 
@@ -461,13 +460,16 @@ class D_star(object):
                 #current_state = self.min_state()
                 #self.state_space = current_state
                 if current_state == self.xt:
-                    break
-                
+                    break  
                 #self.populate_open(self.state_space)
                 self.modify(current_state)
-                draw_open = [self.waypoints[i].location for i in self.OPEN]
-                for i in draw_open:
-                    world.debug.draw_string(self.waypoints[i].location, str(i), life_time=60, color=carla.Color(255, 0, 0))
+                for i in range(len(self.OPEN)):
+                    location = self.OPEN[i][1].transform.location
+                    self.world.debug.draw_string(location, f'init:{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
+
+                if i < len(self.OPEN) - 1:
+                    next_location = self.OPEN[i + 1][1].transform.location
+                    self.world.debug.draw_line(location, next_location, thickness=0.1, color=carla.Color(r=255, g=255, b=0), life_time=60.0, persistent_lines=True)
                 #self.path(current_state)
                 if self.detect_obstacles(self.state_space):
                     try:
@@ -540,8 +542,7 @@ if __name__ == '__main__':
 
     if d_star.state_space in d_star.V:
         d_star.V.remove(d_star.state_space)
-    
-    d_star.run()
+        d_star.run()
 
     if d_star.state_space.transform.location == (d_star.xt.transform.location):
         print("Goal reached!")
