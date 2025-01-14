@@ -43,13 +43,22 @@ def get_legal_neighbors(waypoint):
     
     return neighbors
 
-def _near_obstacle(current_waypoint, obstacle_list, min_distance = 2.0):
-        
+def _near_obstacle(current_waypoint, obstacle_list, min_distance = 4.0):
+   
     for obstalce in obstacle_list:
         distance = obstalce.transform.location.distance(
             current_waypoint.transform.location)
         if distance < min_distance:
             return True
+
+    return False
+
+def _near_goal(current_waypoint, goal, min_distance = 30.0):
+        
+    distance = goal.transform.location.distance(
+        current_waypoint.waypoint.transform.location)
+    if distance < min_distance:
+        return True
 
     return False
 
@@ -60,6 +69,9 @@ def a_star(start_waypoint, end_waypoint, new_obstacle=None, heuristic_func=eucli
     came_from = {}
     g_score = {start_waypoint.id: 0}
     f_score = {start_waypoint.id: start_node.f_cost}
+    nodes_expanded = 0
+    goal_threshold = 4.0
+    goal_threshold_increased = goal_threshold * 2.0
     
     # recevies obstacle from previous pipeline and adds it to the list
     if new_obstacle != None and new_obstacle not in obstacles:
@@ -67,15 +79,21 @@ def a_star(start_waypoint, end_waypoint, new_obstacle=None, heuristic_func=eucli
     
     while not open_set.empty():
         current_node = open_set.get()[2]
+
+        if _near_goal(current_node, end_waypoint) and _near_obstacle(current_node.waypoint, obstacles):
+            goal_threshold = goal_threshold_increased
+            print (goal_threshold)
         
         # Early exit if we have reached near the goal
-        if current_node.waypoint.transform.location.distance(end_waypoint.transform.location) < 2.0:
+        if current_node.waypoint.transform.location.distance(end_waypoint.transform.location) < goal_threshold:
             path = []
 
             while current_node:
                 path.append(current_node.waypoint)
                 current_node = came_from.get(current_node.waypoint.id)
-            print (f_score)
+            for k, v in f_score.items():
+                print (k, ":", v)
+            print (nodes_expanded)
             return list(reversed(path))
         
         # Unlikely to happen. left here for debugging purposes
@@ -84,6 +102,7 @@ def a_star(start_waypoint, end_waypoint, new_obstacle=None, heuristic_func=eucli
         #     return None
         
         for next_waypoint in get_legal_neighbors(current_node.waypoint):
+            nodes_expanded += 1
             # world.debug.draw_string(next_waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=220), life_time=60.0, persistent_lines=True)
             # Add a small cost for lane changes
             lane_change_cost = 5 if next_waypoint.lane_id != current_node.waypoint.lane_id else 0
@@ -96,7 +115,7 @@ def a_star(start_waypoint, end_waypoint, new_obstacle=None, heuristic_func=eucli
             tentative_g_score = g_score[current_node.waypoint.id] + euclidean_heuristic(current_node.waypoint, next_waypoint) + lane_change_cost
 
             #Distance to determine how far obstacles are
-            if _near_obstacle(next_waypoint, obstacles, 4.0):
+            if _near_obstacle(next_waypoint, obstacles, 2.0):
                 tentative_g_score = float('inf')
             # If the next waypoint is already in the open set, we can skip it
             # Comparing g_score for the reason above tentative_g_score.
