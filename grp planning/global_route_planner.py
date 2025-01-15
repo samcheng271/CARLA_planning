@@ -315,12 +315,12 @@ class GlobalRoutePlanner(object):
             if i % 10 == 0:
                 # print(w.transform.location)
                 world.debug.draw_string(w.transform.location, f'{i}', draw_shadow=False,
-                color=carla.Color(r=255, g=0, b=0), life_time=30.0,
+                color=carla.Color(r=255, g=0, b=0), life_time=10.0,
                 persistent_lines=True)
             else:
                 # print(w.transform.location)
                 world.debug.draw_string(w.transform.location, f'{i}', draw_shadow=False,
-                color = carla.Color(r=0, g=0, b=255), life_time=30.0,
+                color = carla.Color(r=0, g=0, b=255), life_time=10.0,
                 persistent_lines=True)
             i += 1
 
@@ -333,7 +333,6 @@ class GlobalRoutePlanner(object):
         edge_route = {}
 
         for edge in localized_route:
-            print (edge)
             edge_route[edge[0]] = edge[1]
 
         current_start = self._localize(route[0].transform.location)[0]
