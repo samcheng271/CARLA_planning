@@ -41,7 +41,6 @@ class D_star(object):
         while len(self.OPEN) > 0:
             self.OPEN.pop(0)
         self.tag[state.id] = "Closed"
-    
 
     def cost(self, wp1, wp2):
         distance = wp1.transform.location.distance(wp2.transform.location)
@@ -230,6 +229,7 @@ class D_star(object):
         #state is not in dictofParents but it should be bc dictofParents has 
         #checking for parent of curr min state return from ps 
         print(f"mc_state.id: {state.id}")
+        self.dictofParents[state.id] = state
         x_parent = self.dictofParents[state.id]
         print(f'xparent: {x_parent}')
         if self.tag[state.id] == 'Closed':
@@ -241,7 +241,8 @@ class D_star(object):
         #print(f'modify: state_space: {state_space}')
         self.modify_cost(state)
         #while kmin is not None and kmin != self.h[self.goal.id]: 
-        while kmin is not None and state != self.goal: 
+        kmin = self.get_kmin()
+        while kmin is not None and state != self.xt: 
             #two vals with the same vars         
             low_min = self.process_state()
             print(f'process_state returned kmin: {low_min}')
@@ -298,20 +299,19 @@ class D_star(object):
     #backpointer list 
     def path(self, state):
         print(f"Starting path search from state: {state}")
-        Path = [state]
+        Path = []
         search_state = state
-        while search_state != self.xt and search_state is not None:
-            if search_state.id not in self.dictofParents:
-                print(f"search_state: {search_state.id} ")
-                print(f"print b: {self.dictofParents}")
-                return [] 
-            next_state = self.dictofParents[search_state.id]
-            print(f"Next state found: {next_state}")
-            Path.append(next_state)
-            search_state = next_state
-
+        #path needs to be recursively called in run not here
+        #while search_state != self.xt and search_state is not None:
+        if search_state.id not in self.dictofParents:
+            print(f"search_state: {search_state.id} ")
+            print(f"print b: {self.dictofParents}")
+            return [] 
+        next_state = self.dictofParents[search_state.id]
+        print(f"Next state found: {next_state}")
+        Path.append(next_state)
+        search_state = next_state
         print(f"Path found: {Path}")
-
         for i in range(len(Path) - 1):
             curr_state = Path[i]
             next_state = Path[i + 1]
@@ -370,12 +370,9 @@ class D_star(object):
                 x = self.min_state()
                 self.state_space = x
                 next_waypoints = self.children(self.state_space)
-                
                 for waypoint in next_waypoints:
-                    self.modify_cost(waypoint) 
-                
+                    self.modify_cost(waypoint)   
                 print(f"Next wps calculated: {[wp.transform.location for wp in next_waypoints]}")
-            
         else:
             print("No obstacles detected")
 
@@ -437,16 +434,9 @@ class D_star(object):
 
             key = cost + h_value
             self.OPEN.append((key, self.state_space)) 
-            for i in range(len(self.OPEN)):
-                location = self.OPEN[i][1].transform.location
-                self.world.debug.draw_string(location, f'init:{i}', draw_shadow=False, color=carla.Color(r=110, g=0, b=220), life_time=60.0, persistent_lines=True)
-
-                if i < len(self.OPEN) - 1:
-                    next_location = self.OPEN[i + 1][1].transform.location
-                    self.world.debug.draw_line(location, next_location, thickness=0.1, color=carla.Color(r=255, g=255, b=0), life_time=60.0, persistent_lines=True)
-
             #this line could be why only the initial state is considered, maybe ms instead of ps but that could still lead to the same issues 
             current_state = self.min_state()
+            print(f"current state: {current_state}")
             while current_state != self.xt:
                 if self.OPEN == []:
                     print("No path found.")
@@ -482,11 +472,10 @@ class D_star(object):
                 # Execute path with safety checks
                 for waypoint in self.Path:
                     if not self.detect_obstacles(waypoint):
-                        self.move_vehicle(waypoint)
+                        self.move_vehicle()
                     else:
                         print("Obstacle detected during execution, replanning needed")
                 #return self.run() 
-
             return self.Path
 
         except Exception as e:
