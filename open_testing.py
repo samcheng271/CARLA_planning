@@ -491,6 +491,8 @@ if __name__ == '__main__':
     world = client.get_world()
     carla_map = world.get_map()
 
+    #check 
+
     # Spawn a firetruck at a random location (point A)
     blueprint_library = world.get_blueprint_library()
     firetruck_bp = blueprint_library.filter('vehicle.carlamotors.firetruck')[0]
