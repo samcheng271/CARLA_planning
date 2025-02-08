@@ -4,8 +4,10 @@ import time
 # from queue import PriorityQueue
 from PriorityQueueDLite import PriorityQueue, Priority
 import sys
+import keyboard
 # print(sys.getrecursionlimit())
 sys.setrecursionlimit(50000)
+
 
 
 class DStarLite:
@@ -51,8 +53,9 @@ class DStarLite:
                 
         for i in range(len(neighbors)):
             initial_dist = neighbors[i].transform.location.distance(waypoint.transform.location)
+            x = neighbors[i]
             # if self.g.get(neighbors[i].id) is None:
-            for z in self.part1:
+            for z in self.part1+[self.goal]:
                 if neighbors[i].transform.location.distance(z.transform.location) < initial_dist:
                     x = z
                     initial_dist=neighbors[i].transform.location.distance(z.transform.location)
@@ -93,6 +96,7 @@ class DStarLite:
                     initial_dist=neighbors[i].transform.location.distance(z.transform.location)
             # vvv is why i use range and not just for i in neighbors, can't assign i=x
             # neighbors[i] = x
+
         for i in range(len(neighbors)):
             if x[i] != 0:
                 neighbors[i] = x[i]
@@ -225,11 +229,7 @@ class DStarLite:
                 self.U.remove(u)
                 for s in self.predecessors(u):
                     if s != self.goal:
-                        # print(f's {s}')
-                        # self.world.debug.draw_string(s.transform.location, 'S', draw_shadow=False, color=carla.Color(r=0, g=0, b=220), life_time=60.0, persistent_lines=True)
-                        # print(f'rhs {self.rhs[s.id]}')
-                        # print(f'g {self.g[u.id]}')
-                        # print(f'heuristic {self.heuristic_c(s, u)}')
+                        
                         self.rhs[s.id] = min(self.rhs[s.id], self.heuristic_c(s, u) + self.g[u.id])
                     self.update_vertex(s)
                 # self.world.debug.draw_string(u.transform.location, 'R', draw_shadow=False, color=carla.Color(r=0, g=0, b=220), life_time=60.0, persistent_lines=True)
@@ -284,8 +284,8 @@ class DStarLite:
         #     self.world.debug.draw_string(i.transform.location, f'{self.g[i.id]}', draw_shadow=False, color=carla.Color(r=0, g=220, b=220), life_time=30.0, persistent_lines=True)
         # for i in self.U.vertices_in_heap:
         #     self.world.debug.draw_string(i.transform.location, f'{self.rhs[i.id]}', draw_shadow=False, color=carla.Color(r=0, g=220, b=220), life_time=30.0, persistent_lines=True)
-
-        while self.s_current != self.goal:
+        print(f'self.s_current {self.s_current}')
+        while True:
             # if self.g[self.s_current.id] == float('inf'):
             if self.rhs[self.start.id] == float('inf'):
                 print("There is no known path to the goal.")
@@ -309,10 +309,17 @@ class DStarLite:
             # Moving the car to the best successor
             self.s_current = arg_min
             print('MOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOVED')
+            print(f'self.s_current {self.s_current}')
+            if self.s_current.transform.location.distance(self.goal.transform.location) < 3.5: # see if i can make it work with 2.0
+                print('ARRIVED')
+                break
             self.s_start = arg_min
             print(f'start: {self.s_start}')
             path.append(self.s_start)
+
             # scan graph for changed costs
+            if(keyboard.is_pressed('space')):
+                print('scanning graph...')
             # changed_edges_with_old_cost = self.rescan()
             # # if any edge costs changed
             # if changed_edges_with_old_cost:
@@ -405,10 +412,7 @@ real_points = []
 wp_pts = {}
 pos = 0
 
-for i in gen_points:
-    real_points.append(carla_map.get_waypoint(i.transform.location, project_to_road=True))
-    wp_pts[carla_map.get_waypoint(i.transform.location, project_to_road=True).id] = pos
-    pos+=1
+
 
 curr_min = gen_points[0]
 for i in gen_points:
@@ -421,7 +425,11 @@ for i in gen_points:
         curr_min = i
 get_end = curr_min
 print(f'gen_points {gen_points[0]}')
-print(f'real_points {real_points[0]}')
+# print(f'real_points {real_points[0]}')
+for i in gen_points + [get_start] +[get_end]:
+    real_points.append(carla_map.get_waypoint(i.transform.location, project_to_road=True))
+    wp_pts[carla_map.get_waypoint(i.transform.location, project_to_road=True).id] = pos
+    pos+=1
 all_waypoints = real_points # + [get_start] +[get_end]
 print(f'all_waypoints {all_waypoints[0]}')
 # world.debug.draw_string(all_waypoints[0].transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=60.0, persistent_lines=True)
