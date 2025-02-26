@@ -97,7 +97,7 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
 def main():
     try:
         # Connect to the CARLA server
-        client = carla.Client('localhost', 2000)
+        client = carla.Client('localhost', 4000)
         client.set_timeout(10.0)
         # world = client.load_world('Town05') # Use this to switch towns
         # Get the world and map
@@ -150,8 +150,6 @@ def main():
         # End of manual waypoint selection
         print(f"Point A wp: {start_waypoint}")
         print(f"Point B wp: {end_waypoint}")
-        
-
 
         # Run A*
         route = a_star(world, start_waypoint, end_waypoint)

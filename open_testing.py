@@ -66,7 +66,6 @@ class D_star(object):
             print(f"Self.xt: Location({self.xt.transform.location.x}, {self.xt.transform.location.y}, {self.xt.transform.location.z})")
             self.h[state.id] = norm 
         return self.h[state.id]
-    
 
     def get_kmin(self):
         if len(self.OPEN) > 0 and self.OPEN[0]:
@@ -299,44 +298,33 @@ class D_star(object):
     #backpointer list 
     def path(self, state):
         print(f"Starting path search from state: {state}")
-        Path = []
-        search_state = state
-        #path needs to be recursively called in run not here
-        #while search_state != self.xt and search_state is not None:
-        if search_state.id not in self.dictofParents:
-            print(f"search_state: {search_state.id} ")
-            print(f"print b: {self.dictofParents}")
-            return [] 
-        next_state = self.dictofParents[search_state.id]
-        print(f"Next state found: {next_state}")
-        Path.append(next_state)
-        search_state = next_state
-        print(f"Path found: {Path}")
-        for i in range(len(Path) - 1):
-            curr_state = Path[i]
-            next_state = Path[i + 1]
+        if not state:
+            return []
+        path_list = []
+        curr = state
+        while True:
+            path_list.append(curr)
+            if curr.id not in self.dictofParents:
+                break
+            par = self.dictofParents[curr.id]
+            if (not par) or (par.id == curr.id):
+                break
+            curr = par
+            if curr == self.x0:
+                path_list.append(curr)
+                break
+        
+        path_list.reverse()
 
-            self.world.debug.draw_line(
-                curr_state.transform.location,
-                next_state.transform.location,
-                thickness=0.2, 
-                color=carla.Color(255, 0, 0), 
-                life_time=10.0 
-            )
-            self.world.debug.draw_point(
-                curr_state.transform.location,
-                size=0.1,
-                color=carla.Color(0, 255, 0), 
-                life_time=10.0
-            )
-            self.world.debug.draw_point(
-                Path[-1].transform.location,
-                size=0.1,
-                color=carla.Color(0, 255, 0),
-                life_time=10.0
-            )
-        return Path
-
+        for i in range(len(path_list) - 1):
+            wp1 = path_list[i].transform.location
+            wp2 = path_list[i + 1].transform.location
+            self.world.debug.draw_line(wp1, wp2, thickness=0.2, 
+                                       color=carla.Color(255, 0, 0), life_time=10.0)
+        
+        self.Path = path_list
+        return path_list
+        
     def detect_obstacles(self, state_space):
        
         child_waypoints = self.children(state_space)
@@ -389,38 +377,27 @@ class D_star(object):
             print("Path empty.")
 
     def visualize_path(self, path):
+        """
+        Visual debugging of the path
+        """
         if not path:
             return
-        
-        for i in range(len(path)-1):
-            start = path[i]
-            end = path[i+1]
-            
-            # Draw the connecting line
-            self.world.debug.draw_line(
-                start.transform.location,
-                end.transform.location,
-                thickness=0.1,
-                color=carla.Color(r=255, g=0, b=0),
-                life_time=15.0
-            )
-            
-            # Draw "0" at each location
-            self.world.debug.draw_string(
-                start.transform.location,
-                "0",
-                draw_shadow=True,
-                color=carla.Color(r=0, g=255, b=0),
-                life_time=15.0
-            )
-              
-            self.world.debug.draw_string(
-                path[-1].transform.location,
-                "0",
-                draw_shadow=True,
-                color=carla.Color(r=0, g=0, b=255),
-                life_time=15.0
-            )
+        for i in range(len(path) - 1):
+            start = path[i].transform.location
+            end = path[i + 1].transform.location
+            # Draw line
+            self.world.debug.draw_line(start, end, thickness=0.1,
+                                       color=carla.Color(r=255, g=0, b=0),
+                                       life_time=15.0)
+            # Mark each location
+            self.world.debug.draw_string(start, "0", draw_shadow=True,
+                                         color=carla.Color(r=0, g=255, b=0),
+                                         life_time=15.0)
+        # Mark the final node
+        final_wp = path[-1].transform.location
+        self.world.debug.draw_string(final_wp, "END?", draw_shadow=True,
+                                     color=carla.Color(r=0, g=0, b=255),
+                                     life_time=15.0)
 
     def run(self):
         try:
@@ -484,7 +461,7 @@ class D_star(object):
 
     
 if __name__ == '__main__':
-    client = carla.Client('localhost', 2000)
+    client = carla.Client('localhost', 4000)
     client.set_timeout(10.0)
     # world = client.load_world('Town05') # Use this to switch towns
     # Get the world and map
