@@ -100,6 +100,8 @@ class BasicAgent(object):
         else:
             self._global_planner = GlobalRoutePlanner(self._map, self._sampling_resolution)
 
+        print("initial location: ", self._vehicle.get_location())
+
         # Get the static elements of the scene
         self._lights_list = self._world.get_actors().filter("*traffic_light*")
         self._lights_map = {}  # Dictionary mapping a traffic light to a wp corrspoing to its trigger volume location
@@ -167,10 +169,10 @@ class BasicAgent(object):
             clean_queue = False
 
         start_waypoint = self._map.get_waypoint(start_location)
+        print("basic_agent start location: " , start_location)
         end_waypoint = self._map.get_waypoint(end_location)
         self._destination = end_location
 
-        
         route_trace = self.trace_route(start_waypoint, end_waypoint, new_obstacle)
 
         # i = 0
@@ -232,7 +234,8 @@ class BasicAgent(object):
 
         # Check for possible vehicle obstacles
         max_vehicle_distance = self._base_vehicle_threshold + self._speed_ratio * vehicle_speed
-        affected_by_vehicle, _, _, obstacle_wpt = self._vehicle_obstacle_detected(vehicle_list, 18)
+        max_vehicle_distance = 25
+        affected_by_vehicle, _, _, obstacle_wpt = self._vehicle_obstacle_detected(vehicle_list, max_vehicle_distance)
         if affected_by_vehicle:
             hazard_obstacle = True
 
@@ -244,7 +247,9 @@ class BasicAgent(object):
 
         control = self._local_planner.run_step()
         # if hazard_obstacle and not hazard_light:
+        #expediating manuvers
         if hazard_obstacle:
+            print ("Entered obstacle resolution")
             # if self._previous_obstacle != obstacle_wpt:
             if self._previous_obstacle == None or self._previous_obstacle.transform.location.distance(obstacle_wpt.transform.location) > 0.5:
                 print ("Replanning around obstacle: ", obstacle_wpt.transform.location)
@@ -252,7 +257,7 @@ class BasicAgent(object):
                 self._previous_obstacle = obstacle_wpt
                 self.set_destination(self._destination, None, obstacle_wpt)
                 self._world.debug.draw_string(obstacle_wpt.transform.location, 'Obstacle', draw_shadow=False,
-                color=carla.Color(r=255, g=0, b=0), life_time=30.0,
+                color=carla.Color(r=255, g=0, b=0), life_time=15.0,
                 persistent_lines=True)
             else:
                 print ("Replanning for previous obstacle")
