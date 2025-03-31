@@ -90,17 +90,14 @@ class BasicAgent(object):
             self._offset = opt_dict['offset']
 
         # Initialize the planners
-        self._local_planner = LocalPlanner(self._vehicle, opt_dict=opt_dict, map_inst=self._map)
-        if grp_inst:
-            if isinstance(grp_inst, GlobalRoutePlanner):
-                self._global_planner = grp_inst
-            else:
-                print("Warning: Ignoring the given map as it is not a 'carla.Map'")
-                self._global_planner = GlobalRoutePlanner(self._map, self._sampling_resolution)
+        if isinstance(grp_inst, GlobalRoutePlanner):
+            self._global_planner = grp_inst
         else:
+            print("Warning: Ignoring the given map as it is not a 'carla.Map'")
             self._global_planner = GlobalRoutePlanner(self._map, self._sampling_resolution)
 
-        print("initial location: ", self._vehicle.get_location())
+
+        self._local_planner = LocalPlanner(self._vehicle, opt_dict=opt_dict, map_inst=self._map)
 
         # Get the static elements of the scene
         self._lights_list = self._world.get_actors().filter("*traffic_light*")
@@ -163,6 +160,7 @@ class BasicAgent(object):
 
         if not start_location:
             start_location = self._local_planner.target_waypoint.transform.location
+            # start_location = self._vehicle.get_location()
             clean_queue = True
         else:
             start_location = self._vehicle.get_location()
@@ -174,6 +172,9 @@ class BasicAgent(object):
         self._destination = end_location
 
         route_trace = self.trace_route(start_waypoint, end_waypoint, new_obstacle)
+
+        # route trace is a list of routes
+        # these now have to be connected via lane change links.
 
         # i = 0
         # for w in route_trace:
@@ -187,6 +188,7 @@ class BasicAgent(object):
         #         color = carla.Color(r=0, g=0, b=255), life_time=60.0,
         #         persistent_lines=True)
         #     i += 1
+
         self._local_planner.set_global_plan(route_trace, clean_queue=clean_queue)
 
     def set_global_plan(self, plan, stop_waypoint_creation=True, clean_queue=True):

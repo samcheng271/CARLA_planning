@@ -124,7 +124,6 @@ class LocalPlanner(object):
 
     def _init_controller(self):
         """Controller initialization"""
-        print("local init_controller location: ", self._vehicle.get_location())
         self._vehicle_controller = VehiclePIDController(self._vehicle,
                                                         args_lateral=self._args_lateral_dict,
                                                         args_longitudinal=self._args_longitudinal_dict,
@@ -135,7 +134,6 @@ class LocalPlanner(object):
 
         # Compute the current vehicle waypoint
         current_waypoint = self._map.get_waypoint(self._vehicle.get_location())
-        print("current vehicle local_planner waypoint: ", current_waypoint)
         self.target_waypoint, self.target_road_option = (current_waypoint, RoadOption.LANEFOLLOW)
         self._waypoints_queue.append((self.target_waypoint, self.target_road_option))
 

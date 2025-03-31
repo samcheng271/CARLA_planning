@@ -45,48 +45,58 @@ class GlobalRoutePlanner(object):
         from origin to destination
         """
         # New parameter: new_obstacle. This feeds the obstacle into the A*.
-        route_trace = []
-        route = self._path_search(origin, destination, world, new_obstacle)
+        full_route = []
+        current_index = 0
+        path = self._path_search(origin, destination, world, new_obstacle)
 
-        current_waypoint = self._wmap.get_waypoint(origin)
-        destination_waypoint = self._wmap.get_waypoint(destination)
+        for route in path:
 
-        for i in range(len(route) - 1):
-            road_option = self._turn_decision(i, route)
-            edge = self._graph.edges[route[i], route[i+1]]
-            # print (current_waypoint, edge, road_option)
-            path = []
+            route_trace = []
 
-            # print (current_waypoint)
-            if edge['type'] != RoadOption.LANEFOLLOW and edge['type'] != RoadOption.VOID:
-                route_trace.append((current_waypoint, road_option))
-                exit_wp = edge['exit_waypoint']
-                n1, n2 = self._road_id_to_edge[exit_wp.road_id][exit_wp.section_id][exit_wp.lane_id]
-                next_edge = self._graph.edges[n1, n2]
-                if next_edge['path']:
-                    closest_index = self._find_closest_in_list(current_waypoint, next_edge['path'])
-                    closest_index = min(len(next_edge['path'])-1, closest_index+5)
-                    current_waypoint = next_edge['path'][closest_index]
-                else:
-                    current_waypoint = next_edge['exit_waypoint']
-                route_trace.append((current_waypoint, road_option))
-                # print(current_waypoint.transform.location, self._localize(current_waypoint.transform.location), road_option)
+            current_waypoint = self._wmap.get_waypoint(route[0])
+            destination_waypoint = self._wmap.get_waypoint(route[-1])
 
-            else:
-                path = path + [edge['entry_waypoint']] + edge['path'] + [edge['exit_waypoint']]
-                closest_index = self._find_closest_in_list(current_waypoint, path)
-                for waypoint in path[closest_index:]:
-                    current_waypoint = waypoint
+            route = route[1:len(route) - 1]
+
+            for i in range(len(route) - 1):
+
+                road_option = self._turn_decision(i, route)
+                edge = self._graph.edges[route[i], route[i+1]]
+                # print (current_waypoint, edge, road_option)
+                path = []
+
+                # print (current_waypoint)
+                if edge['type'] != RoadOption.LANEFOLLOW and edge['type'] != RoadOption.VOID:
+                    route_trace.append((current_waypoint, road_option))
+                    exit_wp = edge['exit_waypoint']
+                    n1, n2 = self._road_id_to_edge[exit_wp.road_id][exit_wp.section_id][exit_wp.lane_id]
+                    next_edge = self._graph.edges[n1, n2]
+                    if next_edge['path']:
+                        closest_index = self._find_closest_in_list(current_waypoint, next_edge['path'])
+                        closest_index = min(len(next_edge['path'])-1, closest_index+5)
+                        current_waypoint = next_edge['path'][closest_index]
+                    else:
+                        current_waypoint = next_edge['exit_waypoint']
                     route_trace.append((current_waypoint, road_option))
                     # print(current_waypoint.transform.location, self._localize(current_waypoint.transform.location), road_option)
-                    if len(route)-i <= 2 and waypoint.transform.location.distance(destination) < 2 * self._sampling_resolution:
-                        break
-                    elif len(route)-i <= 2 and current_waypoint.road_id == destination_waypoint.road_id and current_waypoint.section_id == destination_waypoint.section_id and current_waypoint.lane_id == destination_waypoint.lane_id:
-                        destination_index = self._find_closest_in_list(destination_waypoint, path)
-                        if closest_index > destination_index:
-                            break
 
-        return route_trace
+                else:
+                    path = path + [edge['entry_waypoint']] + edge['path'] + [edge['exit_waypoint']]
+                    closest_index = self._find_closest_in_list(current_waypoint, path)
+                    for waypoint in path[closest_index:]:
+                        current_waypoint = waypoint
+                        route_trace.append((current_waypoint, road_option))
+                        # print(current_waypoint.transform.location, self._localize(current_waypoint.transform.location), road_option)
+                        if len(route)-i <= 2 and waypoint.transform.location.distance(destination) < 2 * self._sampling_resolution:
+                            break
+                        elif len(route)-i <= 2 and current_waypoint.road_id == destination_waypoint.road_id and current_waypoint.section_id == destination_waypoint.section_id and current_waypoint.lane_id == destination_waypoint.lane_id:
+                            destination_index = self._find_closest_in_list(destination_waypoint, path)
+                            if closest_index > destination_index:
+                                break
+
+            full_route.append(route_trace)
+
+        return full_route[0]
 
     def _build_topology(self):
         """
@@ -324,26 +334,67 @@ class GlobalRoutePlanner(object):
                 persistent_lines=True)
             i += 1
 
+        waypoint_edge_dict = {}
+        for waypoint in route:
+            edge = self._localize(waypoint.transform.location)
+
+            waypoint_list = waypoint_edge_dict.get(edge, [])
+
+            waypoint_list.append(waypoint.transform.location)
+            
+            waypoint_edge_dict[edge] = waypoint_list
+
         localized_route = [self._localize(waypoint.transform.location) for waypoint in route]
+
+        ordered_localized_list = list(dict.fromkeys(localized_route))
 
         # for waypoint in route:
         #     print (waypoint.transform.location, self._localize(waypoint.transform.location))
-        # print (localized_route)
+        # print (ordered_localized_list)
 
         edge_route = {}
 
         for edge in localized_route:
             edge_route[edge[0]] = edge[1]
 
+        print(edge_route)
+
         current_start = self._localize(route[0].transform.location)[0]
-        routing = [current_start]
+        routing = [[waypoint_edge_dict[current_start, edge_route[current_start]][0], current_start]]
+        current_index = 0
+        new_path = False
 
-        while True:
-            current_start = edge_route[current_start]
-            routing.append(current_start)
+        for i, (key, val) in enumerate(edge_route.items()):
+            
+            # If the path is a new junction (place to lane change)
+            # then a new starting node is added to it for the grp
+            # to create a path with
+            if not new_path:
+                if val not in routing[current_index]:
+                    routing[current_index].append(val)
+            else:
+                routing[current_index].append(waypoint_edge_dict[key, val][0])
+                if val not in routing[current_index]:
+                    routing[current_index].append(val)
+                new_path = False
+            
+            # if the val isn't a key, this indicates that the ending
+            # edge won't be used to traverse on, thus a lance change
+            # or the car has reached its destination.
+            # With that, a ending point is given, and if its a lane
+            # change, then a new list is started for a new pathing.
+            if val not in edge_route.keys() and i != len(edge_route) - 1:
+                routing[current_index].append(waypoint_edge_dict[key, val][-2])
+                routing.append([])
+                current_index += 1
+                new_path = True
+            elif i == len(edge_route) - 1:
+                routing[current_index].append(waypoint_edge_dict[key, val][-1])
 
-            if routing[-1] == localized_route[-1][1]:
-                break
+        # for i in range(len(routing)):
+        #     routing[i] = list(dict.fromkeys(routing[i]))
+
+        print(routing)
 
         return routing
 

@@ -30,9 +30,9 @@ point_b = carla.Location(point_b_spawn.location)
 # point_b = carla.Location(point_b.x - 10, point_b.y, point_b.z) # Overlay for purposful remapping
 point_c_spawn = carla.Transform(carla.Location(point_a.x - 20, point_a.y, point_a.z), point_a_spawn.rotation) # Lane Blocker
 point_d_spawn = carla.Transform(carla.Location(point_a.x - 65, point_a.y + 1.25, point_a.z), point_b_spawn.rotation) # Mid-Intersection block
-point_a_spawn = carla.Transform(carla.Location(point_a.x - 100, point_a.y, point_a.z), point_a_spawn.rotation) # forward spawn
-point_d_spawn = carla.Transform(carla.Location(point_a.x - 85, point_a.y + 1.25, point_a.z), point_b_spawn.rotation) # Full ahead road block
-point_d_spawn = carla.Transform(carla.Location(point_b.x + 2, point_b.y + 10, point_a.z), point_a_spawn.rotation) # Right Turn Partially blocked
+# point_a_spawn = carla.Transform(carla.Location(point_a.x - 100, point_a.y, point_a.z), point_a_spawn.rotation) # forward spawn
+# point_d_spawn = carla.Transform(carla.Location(point_a.x - 85, point_a.y + 1.25, point_a.z), point_b_spawn.rotation) # Full ahead road block
+# point_d_spawn = carla.Transform(carla.Location(point_b.x + 1, point_b.y + 10, point_a.z), point_a_spawn.rotation) # Right Turn Partially blocked
 # point_c_waypoint = amap.get_waypoint(carla.Location(point_a.x - 20, point_a.y, point_a.z))
 
 print(point_c_spawn)
@@ -62,6 +62,7 @@ print(world)
 i = 0
 try:
     vehicle = world.spawn_actor(vehicle_bp, point_a_spawn) #spawning a random vehicle
+    print ("starting vehicle spawn: ", point_a_spawn)
     vehicle_2 = world.spawn_actor(vehicle_bp_2, point_d_spawn) #spawning a random vehicle
     agent = BasicAgent(vehicle) # Creating a vehicle for agent
     agent.set_destination(point_b) #Set Location Destination
