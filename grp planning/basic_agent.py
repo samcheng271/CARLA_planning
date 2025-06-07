@@ -177,19 +177,54 @@ class BasicAgent(object):
         # these now have to be connected via lane change links.
 
         # i = 0
-        # for w in route_trace:
-        #     # print(w[0].transform.location.x, ",",w[0].transform.location.y, w[1])
-        #     if i % 10 == 0:
-        #         self._world.debug.draw_string(w[0].transform.location, 'f{i}', draw_shadow=False,
-        #         color=carla.Color(r=255, g=0, b=0), life_time=120.0,
-        #         persistent_lines=True)
-        #     else:
-        #         self._world.debug.draw_string(w[0].transform.location, 'f{i}', draw_shadow=False,
-        #         color = carla.Color(r=0, g=0, b=255), life_time=60.0,
-        #         persistent_lines=True)
-        #     i += 1
+        # for route in route_trace:
+        #     for w in route:
+        #         # print(w[0].transform.location.x, ",",w[0].transform.location.y, w[1])
+        #         if i % 10 == 0:
+        #             self._world.debug.draw_string(w[0].transform.location, f'{i}', draw_shadow=False,
+        #             color=carla.Color(r=255, g=0, b=0), life_time=120.0,
+        #             persistent_lines=True)
+        #         else:
+        #             self._world.debug.draw_string(w[0].transform.location, f'{i}', draw_shadow=False,
+        #             color = carla.Color(r=0, g=0, b=255), life_time=60.0,
+        #             persistent_lines=True)
+        #         i += 1
 
-        self._local_planner.set_global_plan(route_trace, clean_queue=clean_queue)
+        # depending on the car's rotation, we can figure out what lane
+        # they want to change to.
+
+        for i in range(len(route_trace)):
+            if (i != len(route_trace) - 1):
+                yaw = route_trace[i][-1][0].transform.rotation.yaw
+
+                x_1, y_1 = route_trace[i][-1][0].transform.location.x, route_trace[i][-1][0].transform.location.y
+                x_2, y_2 = route_trace[i + 1][0][0].transform.location.x, route_trace[i + 1][0][0].transform.location.y
+
+                if yaw < 185 and yaw > 175:
+                    if y_2 < y_1:
+                        lane_path = self._generate_lane_change_path(route_trace[i][-1][0], 'right', 0,0,1)
+                    else:
+                        lane_path = self._generate_lane_change_path(route_trace[i][-1][0], 'left', 0,0,1)
+
+                    print("lane change vertical: ", lane_path)
+                    route_trace[i] = route_trace[i] + lane_path
+                    
+                if yaw < -85 and yaw > -95:
+                    if x_2 < x_1:
+                        lane_path = self._generate_lane_change_path(route_trace[i][-1][0], 'right', 0,0,1)
+                    else:
+                        lane_path = self._generate_lane_change_path(route_trace[i][-1][0], 'left', 0,0,1)
+
+                    route_trace[i] = route_trace[i] + lane_path
+
+        final_route = []
+
+        for route in route_trace:
+            final_route = final_route + route
+
+        print("set_destination: ", final_route)
+
+        self._local_planner.set_global_plan(final_route, clean_queue=clean_queue)
 
     def set_global_plan(self, plan, stop_waypoint_creation=True, clean_queue=True):
         """
@@ -263,9 +298,11 @@ class BasicAgent(object):
                 persistent_lines=True)
             else:
                 print ("Replanning for previous obstacle")
-                control = self.add_emergency_stop(control)
+                # control = self.add_emergency_stop(control)
         elif hazard_obstacle and hazard_light:
             control = self.add_emergency_stop(control)
+
+        print(control)
 
 
         return control
@@ -485,6 +522,8 @@ class BasicAgent(object):
         Use the different distances to fine-tune the maneuver.
         If the lane change is impossible, the returned path will be empty.
         """
+
+        print("in make lane change: ", waypoint.transform.location, direction)
         distance_same_lane = max(distance_same_lane, 0.1)
         distance_other_lane = max(distance_other_lane, 0.1)
         lane_change_distance = max(lane_change_distance, 0.1)

@@ -46,7 +46,6 @@ class GlobalRoutePlanner(object):
         """
         # New parameter: new_obstacle. This feeds the obstacle into the A*.
         full_route = []
-        current_index = 0
         path = self._path_search(origin, destination, world, new_obstacle)
 
         for route in path:
@@ -56,7 +55,12 @@ class GlobalRoutePlanner(object):
             current_waypoint = self._wmap.get_waypoint(route[0])
             destination_waypoint = self._wmap.get_waypoint(route[-1])
 
+            print("\ndestination_waypoint: ", destination_waypoint)
+
+            # Strips the start/end waypoints
             route = route[1:len(route) - 1]
+
+            print("route: ", route)
 
             for i in range(len(route) - 1):
 
@@ -87,16 +91,18 @@ class GlobalRoutePlanner(object):
                         current_waypoint = waypoint
                         route_trace.append((current_waypoint, road_option))
                         # print(current_waypoint.transform.location, self._localize(current_waypoint.transform.location), road_option)
-                        if len(route)-i <= 2 and waypoint.transform.location.distance(destination) < 2 * self._sampling_resolution:
+                        if len(route)-i <= 2 and waypoint.transform.location.distance(destination_waypoint.transform.location) < 2 * self._sampling_resolution:
                             break
                         elif len(route)-i <= 2 and current_waypoint.road_id == destination_waypoint.road_id and current_waypoint.section_id == destination_waypoint.section_id and current_waypoint.lane_id == destination_waypoint.lane_id:
                             destination_index = self._find_closest_in_list(destination_waypoint, path)
                             if closest_index > destination_index:
                                 break
 
+            print("new destination_waypoint: ", route_trace[-1][0])
+
             full_route.append(route_trace)
 
-        return full_route[0]
+        return full_route
 
     def _build_topology(self):
         """
@@ -312,12 +318,16 @@ class GlobalRoutePlanner(object):
         """
         # New parameter: new_obstacle. This feeds the obstacle into the A*.
 
+        print("entering tracing")
+
         origin_waypoint = self._wmap.get_waypoint(origin)
         destination_waypoint = self._wmap.get_waypoint(destination)
 
         start, end = self._localize(origin), self._localize(destination)
 
         route = a_star(origin_waypoint, destination_waypoint, new_obstacle)
+
+        print("exit tracing")
 
         i = 0
         for w in route:
@@ -346,6 +356,7 @@ class GlobalRoutePlanner(object):
 
         localized_route = [self._localize(waypoint.transform.location) for waypoint in route]
 
+        # Eliminates duplicate edges from adjacent waypoints
         ordered_localized_list = list(dict.fromkeys(localized_route))
 
         # for waypoint in route:
@@ -357,9 +368,22 @@ class GlobalRoutePlanner(object):
         for edge in localized_route:
             edge_route[edge[0]] = edge[1]
 
-        print(edge_route)
+        val = None
+
+        edge_route_2 = edge_route.copy()
+
+        for key,value in edge_route.items():
+            if val == value:
+                edge_route_2.pop(key)
+            val = value
+
+        edge_route = edge_route_2
+
+        print("Edge pairs: ", edge_route)
 
         current_start = self._localize(route[0].transform.location)[0]
+
+        # Initializes routing with starting and ending waypoints to insert lane changes in between.
         routing = [[waypoint_edge_dict[current_start, edge_route[current_start]][0], current_start]]
         current_index = 0
         new_path = False
@@ -374,7 +398,9 @@ class GlobalRoutePlanner(object):
                     routing[current_index].append(val)
             else:
                 routing[current_index].append(waypoint_edge_dict[key, val][0])
+                print("start_waypoint: ", waypoint_edge_dict[key, val][0])
                 if val not in routing[current_index]:
+                    routing[current_index].append(key)
                     routing[current_index].append(val)
                 new_path = False
             
@@ -383,8 +409,9 @@ class GlobalRoutePlanner(object):
             # or the car has reached its destination.
             # With that, a ending point is given, and if its a lane
             # change, then a new list is started for a new pathing.
-            if val not in edge_route.keys() and i != len(edge_route) - 1:
+            if i != len(edge_route) - 1 and val != list(edge_route.keys())[i + 1]:
                 routing[current_index].append(waypoint_edge_dict[key, val][-2])
+                print("end_waypoint: ", waypoint_edge_dict[key, val][-2])
                 routing.append([])
                 current_index += 1
                 new_path = True
@@ -394,7 +421,7 @@ class GlobalRoutePlanner(object):
         # for i in range(len(routing)):
         #     routing[i] = list(dict.fromkeys(routing[i]))
 
-        print(routing)
+        print("routing without lane changes: ", len (routing), routing)
 
         return routing
 
