@@ -76,6 +76,7 @@ def a_star(start_waypoint, end_waypoint, new_obstacle=None, heuristic_func=eucli
     # recevies obstacle from previous pipeline and adds it to the list
     if new_obstacle != None and new_obstacle not in obstacles:
         obstacles.append(new_obstacle)
+
     
     while not open_set.empty():
         current_node = open_set.get()[2]
@@ -91,8 +92,8 @@ def a_star(start_waypoint, end_waypoint, new_obstacle=None, heuristic_func=eucli
             while current_node:
                 path.append(current_node.waypoint)
                 current_node = came_from.get(current_node.waypoint.id)
-            for k, v in f_score.items():
-                print (k, ",", v)
+            # for k, v in f_score.items():
+            #     print (k, ",", v)
             return list(reversed(path))
         
         # Unlikely to happen. left here for debugging purposes
@@ -114,7 +115,7 @@ def a_star(start_waypoint, end_waypoint, new_obstacle=None, heuristic_func=eucli
             tentative_g_score = g_score[current_node.waypoint.id] + euclidean_heuristic(current_node.waypoint, next_waypoint) + lane_change_cost
 
             #Distance to determine how far obstacles are
-            if _near_obstacle(next_waypoint, obstacles, 6.0):
+            if _near_obstacle(next_waypoint, obstacles, 2.0):
                 tentative_g_score = float('inf')
             # If the next waypoint is already in the open set, we can skip it
             # Comparing g_score for the reason above tentative_g_score.

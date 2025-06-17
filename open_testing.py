@@ -169,7 +169,7 @@ class D_star(object):
             if kold < self.h[currState.id]:  # raised states
                 print(f'kold < h[x.id]: {kold} < {self.h[currState.id]}')
                 for child in self.children(currState):
-                    #elf.store_h(y)
+                    #elf.store_h(y) 
                     x = self.xt.transform.location.x - child.transform.location.x
                     y = self.xt.transform.location.y - child.transform.location.y
                     z = self.xt.transform.location.z - child.transform.location.z
@@ -336,7 +336,6 @@ class D_star(object):
                 if actor.id != self.vehicle.id:
                     actor_location = actor.get_location()
                     distance = actor_location.distance(child_location)
-
                     if distance < 5.0:
                         return True
         return False

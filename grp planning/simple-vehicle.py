@@ -35,11 +35,7 @@ point_d_spawn = carla.Transform(carla.Location(point_a.x - 65, point_a.y + 1.25,
 # point_d_spawn = carla.Transform(carla.Location(point_b.x + 1, point_b.y + 10, point_a.z), point_a_spawn.rotation) # Right Turn Partially blocked
 # point_c_waypoint = amap.get_waypoint(carla.Location(point_a.x - 20, point_a.y, point_a.z))
 
-print(point_c_spawn)
-
-print(spawn_points[50])
-
-print(world)
+print("Point c:", point_c_spawn)
 
 # w1 = grp.trace_route(point_a, point_b, world) # there are other funcations can be used to generate a route in GlobalRoutePlanner.
     # print (spawn_points[50].location)
@@ -63,7 +59,8 @@ i = 0
 try:
     vehicle = world.spawn_actor(vehicle_bp, point_a_spawn) #spawning a random vehicle
     print ("starting vehicle spawn: ", point_a_spawn)
-    vehicle_2 = world.spawn_actor(vehicle_bp_2, point_d_spawn) #spawning a random vehicle
+    # vehicle_2 = world.spawn_actor(vehicle_bp_2, point_d_spawn) #spawning a random vehicle
+    vehicle_2 = world.spawn_actor(vehicle_bp_2, point_c_spawn) #spawning a random vehicle
     agent = BasicAgent(vehicle) # Creating a vehicle for agent
     agent.set_destination(point_b) #Set Location Destination
 
