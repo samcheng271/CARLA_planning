@@ -21,7 +21,7 @@ class DStarLite:
         self.g = {}
         self.rhs = {}
         self.s_last = None
-        self.s_current = None
+        self.s_current = self.start
         self.all_waypoints = all_waypoints
         self.wp_pos = wp_pts
         self.part1 = []
@@ -130,9 +130,9 @@ class DStarLite:
         #         # print(f'neighbors {neighbors[i]}')
         self.part1.extend(neighbors)
         # draw all predecessors
-        for i in neighbors:
-            if self.g.get(i.id)!= float('inf'):
-                self.world.debug.draw_string(i.transform.location, f'{self.g[i.id]}', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=10.0, persistent_lines=True)
+        # for i in neighbors:
+            # if self.g.get(i.id)!= float('inf'):
+            #     self.world.debug.draw_string(i.transform.location, f'{self.rhs[i.id]}', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=10.0, persistent_lines=True)
         if waypoint.transform.location.distance(self.start.transform.location) < self.resolution+0.5:
             neighbors.append(self.start)
         return neighbors
@@ -157,6 +157,9 @@ class DStarLite:
             return float('inf')
         else:
             return waypoint1.transform.location.distance(waypoint2.transform.location)
+        
+
+        
         if waypoint1.id == 1412984381793799066:
             print("\n\n\nthe target of id", waypoint1)
 
@@ -176,7 +179,7 @@ class DStarLite:
 
     def calculate_key(self, s):
         return Priority(
-            min(self.g[s.id], self.rhs[s.id]) + self.heuristic(s, self.start) + self.km,
+            min(self.g[s.id], self.rhs[s.id]) + self.heuristic(s, self.s_current) + self.km,
             min(self.g[s.id], self.rhs[s.id])
             )
 
@@ -297,7 +300,7 @@ class DStarLite:
                                     min_s = temp
                                 # temp = min( self.heuristic_c(s, s_) + self.g[s_.id], min_s)
                             self.rhs[s.id] = min_s
-                    self.update_vertex(u)
+                    self.update_vertex(s)
             # print(f'self.U {self.U.vertices_in_heap}')
             # print(f'STUFF1:::{self.U.top_key() < self.calculate_key(self.start)}')
             # print(f'STUFF2::: {self.rhs[self.start.id] > self.g[self.start.id]}')
@@ -332,7 +335,8 @@ class DStarLite:
         if self.new_obst==0:
             return False
         else:
-            self.obst_wp=0
+            # self.obst_wp=0
+            self.new_obst=0
             return True
     # def loc_of_id(self,id):
 
@@ -350,7 +354,7 @@ class DStarLite:
 
         
         print(f'self.s_current before while{self.s_current}')
-        while True:
+        while self.s_current.transform.location.distance(self.goal.transform.location) >= 3.5:
             # if self.g[self.s_current.id] == float('inf'):
             if self.rhs[self.start.id] == float('inf'):
                 print("There is no known path to the goal.")
@@ -372,53 +376,54 @@ class DStarLite:
                 if temp<= min_s:
                     min_s = temp
                     arg_min = s_
+
             # Moving the car to the best successor
             self.s_current = arg_min
-            # print('MOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOVED')
-            # print(f'self.s_current {self.s_current}') # waypoint
-            # print("\n\n\nshould be moving")
-            # print(min_s)
-            # 
-            # need a dictionary with all edges
-            # 
+
             self.vehicle.set_transform(self.s_current.transform)
 
             # Insert obst when flag is almost at 67 or when it's near 
-            if self.s_current.transform.location.distance(self.all_waypoints[2872].transform.location)<25 and flag==0:
+            if self.s_current.transform.location.distance(self.all_waypoints[2824].transform.location)<25 and flag==0:
                 # self.add_obst_loc_to_obst_wp(self.all_waypoints[2872].transform.location)
                 flag=1
-                self.obs_signal(self.all_waypoints[2872].transform.location)
-                self.obs_signal(self.all_waypoints[2876].transform.location)
-                self.obs_signal(self.all_waypoints[2880].transform.location)
-                self.world.debug.draw_string(self.all_waypoints[2880].transform.location, f'here', draw_shadow=False, color=carla.Color(r=0, g=220, b=220), life_time=20.0, persistent_lines=True)
+                self.obs_signal(self.all_waypoints[2812].transform.location)
+                self.obs_signal(self.all_waypoints[2816].transform.location)
+                self.obs_signal(self.all_waypoints[2820].transform.location)
+                self.obs_signal(self.all_waypoints[2824].transform.location)
 
                 l=self.all_obst_wps.values()
                 # print(l[0])
                 print("\n\n\nadded obstacle")
-            # if self.s_current.transform.location.distance(self.all_waypoints[2872].transform.location)<15 and flag==1:
-            #     flag=2
-            #     for i in self.all_waypoints:
-            #         self.world.debug.draw_string(i.transform.location, f'{self.rhs[i.id]}', draw_shadow=False, color=carla.Color(r=0, g=220, b=220), life_time=20.0, persistent_lines=True)
 
-            #     print(f"\n\n\nflag: {flag}")
-            # if
-            # flag+=1
-            time.sleep(.5)
+            if self.s_current.transform.location.distance(self.all_waypoints[2824].transform.location)<15 and flag==1:
+                flag=2
+                # count=0
+                for i in self.all_waypoints:
+                    
+                    self.world.debug.draw_string(i.transform.location, f'{self.g[i.id]}', draw_shadow=False, color=carla.Color(r=0, g=220, b=220), life_time=20.0, persistent_lines=True)
+                    # count+=1
+                # self.world.debug.draw_string(self.all_waypoints[2812].transform.location, f'!!!!!!!!!!!!!!!!{self.rhs[i.id]}', draw_shadow=False, color=carla.Color(r=220, g=220, b=220), life_time=20.0, persistent_lines=True)
+
+
+            time.sleep(.01)
+            if self.s_current.transform.location.distance(self.all_waypoints[2824].transform.location)<5:
+                self.world.debug.draw_string(self.s_current.transform.location, f'{self.rhs[self.s_current.id]}', draw_shadow=False, color=carla.Color(r=220, g=200, b=200), life_time=30.0, persistent_lines=True)
+
+                time.sleep(2)
 
             if self.s_current.transform.location.distance(self.goal.transform.location) < 3.5: # see if i can make it work with 2.0
                 print('ARRIVED')
-                break
-            self.s_start = arg_min
-            # print(f'start: {self.s_start}')
-            path.append(self.s_start)
 
-            # adding obstacle
-            # if flag ==
+            # self.start = arg_min
+
+            # path.append(self.start)
+
+            
             # make one point on the path become an obstacle: 167950338076947973394 or 1412984381793799066
 
             # changed_edges_with_old_cost = self.rescan()
             # if any edge costs changed
-            if self.rescan:
+            if self.rescan():
                 
                 self.km += self.heuristic_c(self.s_last, self.start)
                 self.s_last = self.start
@@ -433,12 +438,12 @@ class DStarLite:
                         self.rhs[vertex.id] = float('inf')
 
                         if(c_old>self.heuristic_c(u,vertex)):
-                            if(u.transform.location.distance(self.goal.transform.location) < 3.5):# u!=self.goal
+                            if(not (u.transform.location.distance(self.goal.transform.location) < 3.5)):# u!=self.goal
                                 self.rhs[u.id] = min(self.rhs[u.id], self.heuristic_c(u, vertex) + self.g[vertex.id])
                                 print('\n\n\n\n\n\n\nworked1')
 
                         elif(self.rhs[u.id]==c_old+self.g[vertex.id]):
-                            if(u.transform.location.distance(self.goal.transform.location) < 3.5):
+                            if(u.transform.location.distance(self.goal.transform.location) >= 3.5):
                                 min_s = float('inf')
                                 arg_min = None
                                 # print('bef move')
@@ -450,7 +455,7 @@ class DStarLite:
                                         min_s = temp
                                         arg_min = s_
                                 # Moving the car to the best successor
-                                self.rhs[u.id] = arg_min
+                                self.rhs[u.id] = min_s
                                 print('\n\n\n\n\n\n\nworked2')
                         self.update_vertex(u)
 
@@ -492,7 +497,8 @@ carla_map = world.get_map()
 
 # Spawn a firetruck at a random location (point A)
 blueprint_library = world.get_blueprint_library()
-firetruck_bp = blueprint_library.filter('vehicle.carlamotors.firetruck')[0]
+# firetruck_bp = blueprint_library.filter('vehicle.carlamotors.firetruck')[0]
+firetruck_bp = blueprint_library.filter('vehicle.harley-davidson.low_rider')[0]
 
 spawn_points = carla_map.get_spawn_points()
 # print(f'spawn_points {spawn_points[0]}')
