@@ -17,6 +17,24 @@ def bz_curve(p0, p1, p2, t):
     u = 1.0 - t
     return (u*u) * p0 + 2*u*t * p1 + (t*t) * p2
 
+
+def bz_velocity(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, t: float) -> np.ndarray:
+    '''First derivative Bezier'''
+    return 2*(1 - t)*(p1 - p0) + 2*t*(p2 - p1)
+
+def bz_acc(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
+    """Second derivative Bezier"""
+    return 2*(p2 - 2*p1 + p0)
+
+def bz_curvature(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, t: float) -> float:
+    """Returns scalar curvature"""
+    d1 = bz_velocity(p0, p1, p2, t)
+    d2 = bz_acc(p0, p1, p2)
+    cross = np.cross(d1, d2)
+    num   = np.linalg.norm(cross)
+    den   = np.linalg.norm(d1)**3
+    return float(num / den) 
+
 def loc_to_vec(loc: carla.Location) -> np.ndarray:
     return np.array([loc.x, loc.y, loc.z], dtype=float)
 
@@ -91,20 +109,36 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
             # If the next waypoint is already in the open set, we can skip it
             # Comparing g_score for the reason above tentative_g_score.
             if lane_change:
-                p0 = loc_to_vec(current_node.waypoint.transform.location) 
-                p2 = loc_to_vec(next_waypoint.transform.location)          
-                p1    = p0 + np.array([0.0, 0.0, 3.0])   
-                #right_vec = current_node.waypoint.transform.get_right_vector()
-                #cp_up    = p0 + np.array([0.0, 0.0, 3.0])              
-                #cp_right = p0 + np.array([right_vec.x, right_vec.y, right_vec.z]) * 3.0
-                #p1 = cp_up 
-                for t in np.linspace(0.0, 1.0, 6):                   
-                    pt = bz_curve(p0, p1, p2, t)
+                p0 = loc_to_vec(current_node.waypoint.transform.location)
+                p2 = loc_to_vec(next_waypoint.transform.location)
+
+                nbrs = get_legal_neighbors(current_node.waypoint)
+                if nbrs:
+                    p1 = loc_to_vec(nbrs[0].transform.location)
+                prev_loc = None
+                for t in np.linspace(0.0, 1.0, 12):
+                    pt   = bz_curve(p0, p1, p2, t)
+                    loc  = vec_to_loc(pt)
+                    loc.y += 0.3  #accounts for distance in front of current_node
+
+                    # blue dot
                     world.debug.draw_point(
-                        vec_to_loc(pt),
-                        size=0.08,
+                        loc,
+                        size=0.12,
                         color=carla.Color(0, 0, 255),
-                        life_time=15.0)
+                        life_time=8.0
+                    )
+                    # blue lines are curves debug
+                    if prev_loc is not None:
+                        world.debug.draw_line(
+                            prev_loc, loc,
+                            thickness=0.04,
+                            color=carla.Color(0, 0, 255),
+                            life_time=8.0,
+                            persistent_lines=False
+                        )
+                    prev_loc = loc
+                    
 
             if next_waypoint.id not in g_score or tentative_g_score < g_score[next_waypoint.id]:
                 # Draws the possible routes A* checked
@@ -137,12 +171,16 @@ def main():
         spawn_points = carla_map.get_spawn_points()
 
 
+        start_ind = 15
+        end_ind = 25
         # Choose a random starting location (point A)
-        point_a = random.choice(spawn_points)
+        #point_a = random.choice(spawn_points)
+        point_a = spawn_points[start_ind]
         firetruck = world.spawn_actor(firetruck_bp, point_a)
 
         # Choose a random destination (point B)
-        point_b = random.choice(spawn_points)
+        point_b  = spawn_points[end_ind]
+        #point_b = random.choice(spawn_points)
         while point_b.location == point_a.location:
             point_b = random.choice(spawn_points)
 
