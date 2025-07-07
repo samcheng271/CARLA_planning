@@ -18,6 +18,18 @@ from agents.tools.misc import (get_speed, is_within_distance,
                                get_trafficlight_trigger_location,
                                compute_distance)
 
+import numpy as np
+
+def loc_to_vec(loc: carla.Location) -> np.ndarray:
+        return np.array([loc.x, loc.y, loc.z], dtype=float)
+
+def vec_to_loc(v: np.ndarray) -> carla.Location:
+    return carla.Location(float(v[0]), float(v[1]), float(v[2]))
+
+def bz_curve(p0, p1, p2, t):
+    u = 1.0 - t
+    return (u*u) * p0 + 2*u*t * p1 + (t*t) * p2
+
 
 class BasicAgent(object):
     """
@@ -200,6 +212,26 @@ class BasicAgent(object):
                 x_1, y_1 = route_trace[i][-1][0].transform.location.x, route_trace[i][-1][0].transform.location.y
                 x_2, y_2 = route_trace[i + 1][0][0].transform.location.x, route_trace[i + 1][0][0].transform.location.y
 
+                # Bezier cruves
+                p0 = loc_to_vec(route_trace[i][-1][0].transform.location) 
+                p1 = np.array([x_2, y_1, 0.0]) # control point
+                p2 = loc_to_vec(route_trace[i + 1][0][0].transform.location)          
+
+                print("bezier curves: ", p0, p2, p1)    
+                #right_vec = current_node.waypoint.transform.get_right_vector()
+                #cp_up    = p0 + np.array([0.0, 0.0, 3.0])              
+                #cp_right = p0 + np.array([right_vec.x, right_vec.y, right_vec.z]) * 3.0
+                #p1 = cp_up 
+                for t in np.linspace(0.0, 1.0, 20):                   
+                    pt = bz_curve(p0, p1, p2, t)
+                    self._world.debug.draw_point(
+                        vec_to_loc(pt),
+                        size=0.08,
+                        color=carla.Color(0, 0, 255),
+                        life_time=15.0)
+
+                ###############
+
                 if yaw < 185 and yaw > 175:
                     if y_2 < y_1:
                         lane_path = self._generate_lane_change_path(route_trace[i][-1][0], 'right', 0,0,1)
@@ -301,8 +333,6 @@ class BasicAgent(object):
                 # control = self.add_emergency_stop(control)
         elif hazard_obstacle and hazard_light:
             control = self.add_emergency_stop(control)
-
-        print(control)
 
 
         return control
