@@ -13,13 +13,16 @@ def manhattan_heuristic(waypoint, end_waypoint):
     dz = abs(waypoint.transform.location.z - end_waypoint.transform.location.z)
     return dx + dy + dz
 
-def bz_curve(p0, p1, p2, t):
+def cubic_bz(p0, p1, p2, p3, t):
     u = 1.0 - t
-    return (u*u) * p0 + 2*u*t * p1 + (t*t) * p2
+    return (u**3) * p0 \
+         + 3 * (u**2) * t * p1 \
+         + 3 * u * (t**2) * p2 \
+         + (t**3) * p3
 
-
+'''
 def bz_velocity(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, t: float) -> np.ndarray:
-    '''First derivative Bezier'''
+    """First derivative """
     return 2*(1 - t)*(p1 - p0) + 2*t*(p2 - p1)
 
 def bz_acc(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
@@ -34,7 +37,7 @@ def bz_curvature(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, t: float) -> fl
     num   = np.linalg.norm(cross)
     den   = np.linalg.norm(d1)**3
     return float(num / den) 
-
+'''
 def loc_to_vec(loc: carla.Location) -> np.ndarray:
     return np.array([loc.x, loc.y, loc.z], dtype=float)
 
@@ -109,25 +112,40 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
             # If the next waypoint is already in the open set, we can skip it
             # Comparing g_score for the reason above tentative_g_score.
             if lane_change:
-                p0 = loc_to_vec(current_node.waypoint.transform.location)
-                p2 = loc_to_vec(next_waypoint.transform.location)
+                prev_wps = current_node.waypoint.previous(2.0)
+                #if not prev_wps:
+                    #continue
+                prev_wp = prev_wps[0]
+                p0 = loc_to_vec(prev_wp.transform.location)
+                p1 = loc_to_vec(current_node.waypoint.transform.location)
+                #p2 needs to be current node's neighbor either left or right 
+                #p2 = loc_to_vec(next_waypoint.transform.location)
+                p3 = loc_to_vec(next_waypoint.transform.location)
 
                 nbrs = get_legal_neighbors(current_node.waypoint)
-                if nbrs:
-                    p1 = loc_to_vec(nbrs[0].transform.location)
+                #if nbrs:
+                    #should be the neighbor expanded to the right
+                    #p2 = loc_to_vec(nbrs[3].transform.location)
+                for nb in nbrs:
+                    if nb.lane_id != current_node.waypoint.lane_id:
+                        p2 = loc_to_vec(nb.transform.location)
+                        break
+
                 prev_loc = None
                 for t in np.linspace(0.0, 1.0, 12):
-                    pt   = bz_curve(p0, p1, p2, t)
+                    pt   = cubic_bz(p0, p1, p2, p3, t)
                     loc  = vec_to_loc(pt)
                     loc.y += 0.3  #accounts for distance in front of current_node
 
                     # blue dot
+                    '''
                     world.debug.draw_point(
                         loc,
                         size=0.12,
                         color=carla.Color(0, 0, 255),
                         life_time=8.0
                     )
+                    '''
                     # blue lines are curves debug
                     if prev_loc is not None:
                         world.debug.draw_line(
@@ -236,6 +254,8 @@ def main():
             world.debug.draw_string(waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=25.0, persistent_lines=True)
 
         # Follow the route
+
+        
         for i, waypoint in enumerate(route):
             # Keeping for debugging purposes
             # if time.time() - start_time > timeout:
@@ -246,7 +266,7 @@ def main():
             if i % 10 == 0:  # Print progress every 10 waypoints
                 print(f"Waypoint {i}/{len(route)}")
             time.sleep(0.05)  # Reduced delay for faster execution
-
+        
         print("Firetruck has reached its destination or the route has ended!")
 
     finally:
