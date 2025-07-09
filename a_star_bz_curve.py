@@ -3,6 +3,9 @@ import random
 import time
 import numpy as np
 from queue import PriorityQueue
+from itertools import tee
+import math
+
 
 def euclidean_heuristic(waypoint, end_waypoint):
     return waypoint.transform.location.distance(end_waypoint.transform.location)
@@ -20,6 +23,10 @@ def cubic_bz(p0, p1, p2, p3, t):
          + 3 * u * (t**2) * p2 \
          + (t**3) * p3
 
+def pairwise(iterable):
+    a, b = tee(iterable)
+    next(b, None)
+    return zip(a, b)
 '''
 def bz_velocity(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, t: float) -> np.ndarray:
     """First derivative """
@@ -72,6 +79,80 @@ def get_legal_neighbors(waypoint):
             neighbors.append(right_lane)
     return neighbors
 
+def smooth_lane_change(route, curve_pts=30):
+    smooth_pts = []
+    i = 0
+    while i < len(route)-1:
+        curr = route[i]
+        next  = route[i+1]
+        if (curr.lane_id != next.lane_id):
+
+            p0_wp = route[i-1]
+            p1_wp = curr
+            p2_wp = next
+            p3_wp = route[i+2]
+
+            p0 = loc_to_vec(p0_wp.transform.location)
+            p1 = loc_to_vec(p1_wp.transform.location)
+            p2 = loc_to_vec(p2_wp.transform.location)
+            p3 = loc_to_vec(p3_wp.transform.location)
+            if not smooth_pts:
+                smooth_pts.append(p0_wp.transform)
+            for t in np.linspace(0.0, 1.0, curve_pts, endpoint=True):
+                pt = cubic_bz(p0, p1, p2, p3, t)
+                loc = vec_to_loc(pt)
+                rot = p3_wp.transform.rotation 
+                smooth_pts.append(carla.Transform(loc, rot))
+            i += 2 
+        else:
+            smooth_pts.append(curr.transform)
+            i += 1
+    smooth_pts.append(route[-1].transform)
+    return smooth_pts
+
+def draw_bz(world, route, samples=30):
+    for i, (curr_wp, next_wp) in enumerate(pairwise(route)):
+        if (curr_wp.lane_id != next_wp.lane_id):
+            p0_loc = route[i-1].transform.location
+            p1_loc = curr_wp.transform.location
+            p2_loc = next_wp.transform.location
+            p3_loc = route[i+2].transform.location
+
+            if i-2 >= 0:
+                prev_loc = route[i-2].transform.location
+                world.debug.draw_line(
+                    prev_loc, p0_loc,
+                    thickness=0.05,
+                    color=carla.Color(0,0,255),
+                    life_time=10.0
+                )
+            
+            p0 = np.array([p0_loc.x, p0_loc.y, p0_loc.z])
+            p1 = np.array([p1_loc.x, p1_loc.y, p1_loc.z])
+            p2 = np.array([p2_loc.x, p2_loc.y, p2_loc.z])
+            p3 = np.array([p3_loc.x, p3_loc.y, p3_loc.z])
+            
+            prev_pt = cubic_bz(p0, p1, p2, p3, 0.0)
+            for t in np.linspace(0.0, 1.0, samples, endpoint=True)[1:]:
+                curr_pt = cubic_bz(p0, p1, p2, p3, t)
+                loc0 = carla.Location(prev_pt[0], prev_pt[1], prev_pt[2])
+                loc1 = carla.Location(curr_pt[0], curr_pt[1], curr_pt[2])
+                world.debug.draw_line(
+                    loc0, loc1,
+                    thickness=0.05,
+                    color=carla.Color(0,0,255),
+                    life_time=10.0
+                )
+                prev_pt = curr_pt
+            if i+3 < len(route):
+                next_loc = route[i+3].transform.location
+                world.debug.draw_line(
+                    p3_loc, next_loc,
+                    thickness=0.05,
+                    color=carla.Color(0,0,255),
+                    life_time=10.0
+                )
+
 def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heuristic, max_distance=5000):
     start_node = AStarNode(start_waypoint, 0, heuristic_func(start_waypoint, end_waypoint))
     open_set = PriorityQueue()
@@ -111,52 +192,6 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
             tentative_g_score = g_score[current_node.waypoint.id] + euclidean_heuristic(current_node.waypoint, next_waypoint) + lane_change_cost
             # If the next waypoint is already in the open set, we can skip it
             # Comparing g_score for the reason above tentative_g_score.
-            if lane_change:
-                prev_wps = current_node.waypoint.previous(2.0)
-                #if not prev_wps:
-                    #continue
-                prev_wp = prev_wps[0]
-                p0 = loc_to_vec(prev_wp.transform.location)
-                p1 = loc_to_vec(current_node.waypoint.transform.location)
-                #p2 needs to be current node's neighbor either left or right 
-                #p2 = loc_to_vec(next_waypoint.transform.location)
-                p3 = loc_to_vec(next_waypoint.transform.location)
-
-                nbrs = get_legal_neighbors(current_node.waypoint)
-                #if nbrs:
-                    #should be the neighbor expanded to the right
-                    #p2 = loc_to_vec(nbrs[3].transform.location)
-                for nb in nbrs:
-                    if nb.lane_id != current_node.waypoint.lane_id:
-                        p2 = loc_to_vec(nb.transform.location)
-                        break
-
-                prev_loc = None
-                for t in np.linspace(0.0, 1.0, 12):
-                    pt   = cubic_bz(p0, p1, p2, p3, t)
-                    loc  = vec_to_loc(pt)
-                    loc.y += 0.3  #accounts for distance in front of current_node
-
-                    # blue dot
-                    '''
-                    world.debug.draw_point(
-                        loc,
-                        size=0.12,
-                        color=carla.Color(0, 0, 255),
-                        life_time=8.0
-                    )
-                    '''
-                    # blue lines are curves debug
-                    if prev_loc is not None:
-                        world.debug.draw_line(
-                            prev_loc, loc,
-                            thickness=0.04,
-                            color=carla.Color(0, 0, 255),
-                            life_time=8.0,
-                            persistent_lines=False
-                        )
-                    prev_loc = loc
-                    
 
             if next_waypoint.id not in g_score or tentative_g_score < g_score[next_waypoint.id]:
                 # Draws the possible routes A* checked
@@ -237,13 +272,18 @@ def main():
         # Run A*
         route = a_star(world, start_waypoint, end_waypoint)
 
+
         if route is None:
             # To prevent infinite loop
             print("Failed to find a path. Try adjusting the max_distance in the a_star function.")
             firetruck.destroy()
             return
 
-        print(f"Route found with {len(route)} waypoints")
+        draw_bz(
+            world, route,
+            samples=30
+        )
+        print(f"Route has {len(route)} waypoints")
 
         # Keeping for debugging purposes
         # start_time = time.time()
@@ -254,8 +294,10 @@ def main():
             world.debug.draw_string(waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=25.0, persistent_lines=True)
 
         # Follow the route
+        smooth_route = smooth_lane_change(route, curve_pts=12)
+        #log_spacing(smooth_route)
 
-        
+        '''
         for i, waypoint in enumerate(route):
             # Keeping for debugging purposes
             # if time.time() - start_time > timeout:
@@ -266,9 +308,21 @@ def main():
             if i % 10 == 0:  # Print progress every 10 waypoints
                 print(f"Waypoint {i}/{len(route)}")
             time.sleep(0.05)  # Reduced delay for faster execution
-        
-        print("Firetruck has reached its destination or the route has ended!")
+        '''
 
+        '''
+        smooth_route = bz_route(route, num_curve_points=12)
+        for i, transform in enumerate(smooth_route):
+            firetruck.set_transform(transform)
+            if i % 20 == 0:
+                print(f"Smooth step {i}/{len(smooth_route)}")
+            time.sleep(0.05)
+        '''
+
+        for i, tr in enumerate(smooth_route):
+            firetruck.set_transform(tr)
+            time.sleep(0.05)
+        print("Firetruck has reached its destination or the route has ended!")
     finally:
         # Clean up
         firetruck.destroy()
