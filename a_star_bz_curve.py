@@ -27,24 +27,63 @@ def pairwise(iterable):
     a, b = tee(iterable)
     next(b, None)
     return zip(a, b)
+
+def bz_velocity(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, t: float) -> np.ndarray:
+    """First derivative of a cubic Bézier"""
+    u = 1.0 - t
+    return 3 * ((u**2) * (p1 - p0) + 2 * u * t * (p2 - p1) + (t**2) * (p3 - p2))
+
+def bz_acc(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, t: float) -> np.ndarray:
+    """Second derivative of a cubic Bézier"""
+    u = 1.0 - t
+    return 6 * (u * (p2 - 2*p1 + p0) + t * (p3 - 2*p2 + p1))
+
 '''
-def bz_velocity(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, t: float) -> np.ndarray:
-    """First derivative """
-    return 2*(1 - t)*(p1 - p0) + 2*t*(p2 - p1)
+def bz_jerk(p0, p1, p2, p3, t):
+    u = 1.0 - t
+    return 6 * ((p3 - 3*p2 + 3*p1 - p0)) 
+'''
 
-def bz_acc(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
-    """Second derivative Bezier"""
-    return 2*(p2 - 2*p1 + p0)
-
-def bz_curvature(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, t: float) -> float:
-    """Returns scalar curvature"""
-    d1 = bz_velocity(p0, p1, p2, t)
-    d2 = bz_acc(p0, p1, p2)
+def bz_curvature(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, t: float) -> float:
+    d1 = bz_velocity(p0, p1, p2, p3, t)
+    d2 = bz_acc(p0, p1, p2, p3, t)
     cross = np.cross(d1, d2)
     num   = np.linalg.norm(cross)
     den   = np.linalg.norm(d1)**3
-    return float(num / den) 
+    return float(num / den)
 '''
+def jaggedness(route):
+    xy_list = []
+    for wp in route:
+        if hasattr(wp, "location"):
+            wp_loc = wp.location
+        
+        else: 
+            if hasattr(wp, "transform") and hasattr(wp.transform, "location"):
+                wp_loc = wp.transform.location
+        
+        xy_list.append([wp_loc.x, wp_loc.y])
+    if len(xy_list) < 3:
+        return 0.0
+    xy = np.stack(xy_list, axis=0)
+    head_angle = np.unwrap(np.arctan2(np.diff(xy[:,1]), np.diff(xy[:,0])))
+    return np.sum(np.abs(np.diff(head_angle)))
+'''
+def jaggedness(route): 
+    wp_xy = []
+    for wp in route: 
+        if hasattr(wp, "location"):
+            wp_loc = wp.location
+        else: 
+            if hasattr(wp, "transform") and hasattr(wp.transform, "location"):
+                wp_loc = wp.transform.location
+        wp_xy.append([wp_loc.x, wp_loc.y])
+    if(len(wp_xy) < 3):
+        return "zero"
+    stacked_list = np.stack(wp_xy, axis = 0)
+    head_angle = np.unwrap(np.arctan2(np.diff(stacked_list[:,1]), np.diff(stacked_list[:,0])))
+    return np.sum(np.abs(np.diff(head_angle)))
+
 def loc_to_vec(loc: carla.Location) -> np.ndarray:
     return np.array([loc.x, loc.y, loc.z], dtype=float)
 
@@ -96,10 +135,13 @@ def smooth_lane_change(route, curve_pts=30):
             p1 = loc_to_vec(p1_wp.transform.location)
             p2 = loc_to_vec(p2_wp.transform.location)
             p3 = loc_to_vec(p3_wp.transform.location)
+
             if not smooth_pts:
                 smooth_pts.append(p0_wp.transform)
             for t in np.linspace(0.0, 1.0, curve_pts, endpoint=True):
                 pt = cubic_bz(p0, p1, p2, p3, t)
+                curve = bz_curvature(p0, p1, p2, p3, t)
+                print(f"t={t:.3}, curvature={curve:.6f}")
                 loc = vec_to_loc(pt)
                 rot = p3_wp.transform.rotation 
                 smooth_pts.append(carla.Transform(loc, rot))
@@ -172,23 +214,13 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
                 path.append(current_node.waypoint)
                 current_node = came_from.get(current_node.waypoint.id)
             return list(reversed(path))
-        
-        # Unlikely to happen. left here for debugging purposes
-        # if g_score[current_node.waypoint.id] > max_distance:
-        #     print(f"A* search stopped: exceeded max distance of {max_distance}m")
-        #     return None
-        
+  
         for next_waypoint in get_legal_neighbors(current_node.waypoint):
             # world.debug.draw_string(next_waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=220), life_time=60.0, persistent_lines=True)
             # Add a small cost for lane changes
             lane_change = next_waypoint.lane_id != current_node.waypoint.lane_id
             lane_change_cost = 5 if lane_change else 0
 
-            # tentative = g score + heuristic + lane change cost
-            # This sum gives us the total cost to reach the next waypoint from the start,
-            # which is the definition of the g_score for that waypoint.
-            # The f_score is considered at the end of the algorithm.
-            # Therefore, this is g_score and not f_score
             tentative_g_score = g_score[current_node.waypoint.id] + euclidean_heuristic(current_node.waypoint, next_waypoint) + lane_change_cost
             # If the next waypoint is already in the open set, we can skip it
             # Comparing g_score for the reason above tentative_g_score.
@@ -224,8 +256,8 @@ def main():
         spawn_points = carla_map.get_spawn_points()
 
 
-        start_ind = 15
-        end_ind = 25
+        start_ind = 25
+        end_ind = 35
         # Choose a random starting location (point A)
         #point_a = random.choice(spawn_points)
         point_a = spawn_points[start_ind]
@@ -243,46 +275,19 @@ def main():
         print("Firetruck starting at", point_a.location)
         print(f"Destination: {point_b.location}")
 
-
-        # Manual waypoint selection
-        # Uncomment below to manually test with 2 points
-
-        # # These two points are used to test lane changes
-        # point_a = carla.Location(x=-52.133560, y=-40.180298, z=0.600000)
-        # point_b = carla.Location(x=-111.120361, y=72.898865, z=0.600000)
-
-        # # Another 2 points to test if vehicle should stop nearby destination
-        # point_a = carla.Location(x=-64.581863, y=-65.167366, z=0.600000)
-        # point_b = carla.Location(x=-27.022133, y=69.714005, z=0.600000)
-
-        # # Another 2 points to test if vehicle should stop nearby destination
-        # # point_a = carla.Location(x=109.946968, y=-17.187952, z=0.599999)
-        # # point_b = carla.Location(x=26.382587, y=-57.401386, z=0.600000)
-
-        # # Get the waypoint closest to point_a and point_b
-        # waypoint_a = carla_map.get_waypoint(point_a, project_to_road=True)
-        # waypoint_b = carla_map.get_waypoint(point_b, project_to_road=True)
-
-        # start_waypoint = waypoint_a
-        # end_waypoint = waypoint_b
-        # End of manual waypoint selection
         print(f"Point A wp: {start_waypoint}")
         print(f"Point B wp: {end_waypoint}")
 
         # Run A*
         route = a_star(world, start_waypoint, end_waypoint)
-
+        print("A* alone jaggedness:", jaggedness(route))
 
         if route is None:
             # To prevent infinite loop
             print("Failed to find a path. Try adjusting the max_distance in the a_star function.")
             firetruck.destroy()
             return
-
-        draw_bz(
-            world, route,
-            samples=30
-        )
+        draw_bz(world, route,samples=30)
         print(f"Route has {len(route)} waypoints")
 
         # Keeping for debugging purposes
@@ -295,30 +300,8 @@ def main():
 
         # Follow the route
         smooth_route = smooth_lane_change(route, curve_pts=12)
+        print("A* bz jaggedness:", jaggedness(smooth_route))
         #log_spacing(smooth_route)
-
-        '''
-        for i, waypoint in enumerate(route):
-            # Keeping for debugging purposes
-            # if time.time() - start_time > timeout:
-            #     print(f"Timeout reached after {timeout} seconds")
-            #     break
-
-            firetruck.set_transform(waypoint.transform)
-            if i % 10 == 0:  # Print progress every 10 waypoints
-                print(f"Waypoint {i}/{len(route)}")
-            time.sleep(0.05)  # Reduced delay for faster execution
-        '''
-
-        '''
-        smooth_route = bz_route(route, num_curve_points=12)
-        for i, transform in enumerate(smooth_route):
-            firetruck.set_transform(transform)
-            if i % 20 == 0:
-                print(f"Smooth step {i}/{len(smooth_route)}")
-            time.sleep(0.05)
-        '''
-
         for i, tr in enumerate(smooth_route):
             firetruck.set_transform(tr)
             time.sleep(0.05)
