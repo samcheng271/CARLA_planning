@@ -16,33 +16,30 @@ def manhattan_heuristic(waypoint, end_waypoint):
     dz = abs(waypoint.transform.location.z - end_waypoint.transform.location.z)
     return dx + dy + dz
 
-def cubic_bz(p0, p1, p2, p3, t):
-    u = 1.0 - t
-    return (u**3) * p0 \
-         + 3 * (u**2) * t * p1 \
-         + 3 * u * (t**2) * p2 \
-         + (t**3) * p3
-
 def pairwise(iterable):
     a, b = tee(iterable)
     next(b, None)
     return zip(a, b)
 
+def loc_to_vec(loc: carla.Location) -> np.ndarray:
+    return np.array([loc.x, loc.y, loc.z], dtype=float)
+
+def vec_to_loc(v: np.ndarray) -> carla.Location:
+    return carla.Location(float(v[0]), float(v[1]), float(v[2]))
+
+def cubic_bz(p0, p1, p2, p3, t):
+    u = 1.0 - t
+    return (u**3) * p0 + 3 * (u**2) * t * p1 + 3 * u * (t**2) * p2 + (t**3) * p3
+
 def bz_velocity(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, t: float) -> np.ndarray:
-    """First derivative of a cubic Bézier"""
+    #First derivative of a cubic bezier 
     u = 1.0 - t
     return 3 * ((u**2) * (p1 - p0) + 2 * u * t * (p2 - p1) + (t**2) * (p3 - p2))
 
 def bz_acc(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, t: float) -> np.ndarray:
-    """Second derivative of a cubic Bézier"""
+    #Second derivative of a cubic bezier 
     u = 1.0 - t
     return 6 * (u * (p2 - 2*p1 + p0) + t * (p3 - 2*p2 + p1))
-
-'''
-def bz_jerk(p0, p1, p2, p3, t):
-    u = 1.0 - t
-    return 6 * ((p3 - 3*p2 + 3*p1 - p0)) 
-'''
 
 def bz_curvature(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, t: float) -> float:
     d1 = bz_velocity(p0, p1, p2, p3, t)
@@ -51,24 +48,7 @@ def bz_curvature(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray,
     num   = np.linalg.norm(cross)
     den   = np.linalg.norm(d1)**3
     return float(num / den)
-'''
-def jaggedness(route):
-    xy_list = []
-    for wp in route:
-        if hasattr(wp, "location"):
-            wp_loc = wp.location
-        
-        else: 
-            if hasattr(wp, "transform") and hasattr(wp.transform, "location"):
-                wp_loc = wp.transform.location
-        
-        xy_list.append([wp_loc.x, wp_loc.y])
-    if len(xy_list) < 3:
-        return 0.0
-    xy = np.stack(xy_list, axis=0)
-    head_angle = np.unwrap(np.arctan2(np.diff(xy[:,1]), np.diff(xy[:,0])))
-    return np.sum(np.abs(np.diff(head_angle)))
-'''
+
 def jaggedness(route): 
     wp_xy = []
     for wp in route: 
@@ -82,13 +62,10 @@ def jaggedness(route):
         return "zero"
     stacked_list = np.stack(wp_xy, axis = 0)
     head_angle = np.unwrap(np.arctan2(np.diff(stacked_list[:,1]), np.diff(stacked_list[:,0])))
-    return np.sum(np.abs(np.diff(head_angle)))
-
-def loc_to_vec(loc: carla.Location) -> np.ndarray:
-    return np.array([loc.x, loc.y, loc.z], dtype=float)
-
-def vec_to_loc(v: np.ndarray) -> carla.Location:
-    return carla.Location(float(v[0]), float(v[1]), float(v[2]))
+    diff_angle = np.diff(head_angle)
+    abs_angle = np.abs(diff_angle)
+    sum_of_angles = np.sum(abs_angle)
+    return sum_of_angles
 
 class AStarNode:
     def __init__(self, waypoint, g_cost, h_cost, parent=None):
@@ -287,7 +264,7 @@ def main():
             print("Failed to find a path. Try adjusting the max_distance in the a_star function.")
             firetruck.destroy()
             return
-        draw_bz(world, route,samples=30)
+        draw_bz(world,route,samples=30)
         print(f"Route has {len(route)} waypoints")
 
         # Keeping for debugging purposes
