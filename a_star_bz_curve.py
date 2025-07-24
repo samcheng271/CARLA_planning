@@ -130,47 +130,91 @@ def smooth_lane_change(route, curve_pts=30):
     return smooth_pts
 
 def draw_bz(world, route, samples=30):
-    for i, (curr_wp, next_wp) in enumerate(pairwise(route)):
-        if (curr_wp.lane_id != next_wp.lane_id):
+    if len(route) < 4:
+        return
+    
+    i = 0
+    prev_draw_point = None
+    
+    while i < len(route) - 1:
+        curr_wp = route[i]
+        next_wp = route[i + 1]
+        
+        if curr_wp.lane_id != next_wp.lane_id and i > 0 and i < len(route) - 2:
+            # Lane change detected - draw Bézier curve
             p0_loc = route[i-1].transform.location
             p1_loc = curr_wp.transform.location
             p2_loc = next_wp.transform.location
             p3_loc = route[i+2].transform.location
-
-            if i-2 >= 0:
-                prev_loc = route[i-2].transform.location
-                world.debug.draw_line(
-                    prev_loc, p0_loc,
-                    thickness=0.05,
-                    color=carla.Color(0,0,255),
-                    life_time=10.0
-                )
             
+            # Convert to numpy arrays for Bézier calculation
             p0 = np.array([p0_loc.x, p0_loc.y, p0_loc.z])
             p1 = np.array([p1_loc.x, p1_loc.y, p1_loc.z])
             p2 = np.array([p2_loc.x, p2_loc.y, p2_loc.z])
             p3 = np.array([p3_loc.x, p3_loc.y, p3_loc.z])
             
-            prev_pt = cubic_bz(p0, p1, p2, p3, 0.0)
+            # Draw straight line from previous point to start of curve if needed
+            if prev_draw_point is not None:
+                start_curve_loc = carla.Location(p0[0], p0[1], p0[2] + 0.5)
+                world.debug.draw_line(
+                    prev_draw_point, start_curve_loc,
+                    thickness=0.10,
+                    color=carla.Color(r=0, g=255, b=0),
+                    life_time=10.0,
+                    persistent_lines=True
+                )
+            
+            # Draw the Bézier curve
+            prev_pt = p0
             for t in np.linspace(0.0, 1.0, samples, endpoint=True)[1:]:
                 curr_pt = cubic_bz(p0, p1, p2, p3, t)
-                loc0 = carla.Location(prev_pt[0], prev_pt[1], prev_pt[2])
-                loc1 = carla.Location(curr_pt[0], curr_pt[1], curr_pt[2])
+                loc0 = carla.Location(prev_pt[0], prev_pt[1], prev_pt[2] + 0.5)
+                loc1 = carla.Location(curr_pt[0], curr_pt[1], curr_pt[2] + 0.5)
+                
                 world.debug.draw_line(
                     loc0, loc1,
-                    thickness=0.05,
-                    color=carla.Color(0,0,255),
-                    life_time=10.0
+                    thickness=0.10,
+                    color=carla.Color(0, 255, 0),
+                    life_time=10.0,
+                    persistent_lines=True
                 )
                 prev_pt = curr_pt
-            if i+3 < len(route):
-                next_loc = route[i+3].transform.location
+            
+            # Update the previous draw point to end of curve
+            prev_draw_point = carla.Location(p3[0], p3[1], p3[2] + 0.5)
+            
+            # Skip the intermediate waypoints since we've drawn the curve
+            i += 2
+        else:
+            # Regular straight segment
+            curr_loc = curr_wp.transform.location
+            next_loc = next_wp.transform.location
+            
+            # Adjust for visualization
+            curr_loc_adj = carla.Location(curr_loc.x, curr_loc.y, curr_loc.z + 0.5)
+            next_loc_adj = carla.Location(next_loc.x, next_loc.y, next_loc.z + 0.5)
+            
+            # Connect from previous point if there was a gap
+            if prev_draw_point is not None:
                 world.debug.draw_line(
-                    p3_loc, next_loc,
-                    thickness=0.05,
-                    color=carla.Color(0,0,255),
-                    life_time=10.0
+                    prev_draw_point, curr_loc_adj,
+                    thickness=0.10,
+                    color=carla.Color(r=0, g=255, b=0),
+                    life_time=10.0,
+                    persistent_lines=True
                 )
+            
+            # Draw the straight segment
+            world.debug.draw_line(
+                curr_loc_adj, next_loc_adj,
+                thickness=0.10,
+                color=carla.Color(r=0, g=255, b=0),
+                life_time=10.0,
+                persistent_lines=True
+            )
+            
+            prev_draw_point = next_loc_adj
+            i += 1
 
 def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heuristic, max_distance=5000):
     start_node = AStarNode(start_waypoint, 0, heuristic_func(start_waypoint, end_waypoint))
@@ -204,7 +248,7 @@ def a_star(world, start_waypoint, end_waypoint, heuristic_func=euclidean_heurist
 
             if next_waypoint.id not in g_score or tentative_g_score < g_score[next_waypoint.id]:
                 # Draws the possible routes A* checked
-                world.debug.draw_string(next_waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=0, g=220, b=0), life_time=25.0, persistent_lines=True)
+                #world.debug.draw_string(next_waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=0, g=220, b=0), life_time=25.0, persistent_lines=True)
                 
                 came_from[next_waypoint.id] = current_node
                 
@@ -235,6 +279,12 @@ def main():
 
         start_ind = 25
         end_ind = 35
+        #start_ind = 20
+        #end_ind = 30
+        #start_ind = 29
+        #end_ind = 39
+        #start_ind = 12
+        #end_ind = 22
         # Choose a random starting location (point A)
         #point_a = random.choice(spawn_points)
         point_a = spawn_points[start_ind]
@@ -272,15 +322,18 @@ def main():
         # timeout = 300  # 5 minutes timeout
         # route = carla_map.generate_waypoints(2.0)
         # Draws the route the vehicle will follow (red)
+        '''
         for waypoint in route:
             world.debug.draw_string(waypoint.transform.location, '^', draw_shadow=False, color=carla.Color(r=220, g=0, b=0), life_time=25.0, persistent_lines=True)
-
+        '''
         # Follow the route
         smooth_route = smooth_lane_change(route, curve_pts=12)
         print("A* bz jaggedness:", jaggedness(smooth_route))
         #log_spacing(smooth_route)
         for i, tr in enumerate(smooth_route):
             firetruck.set_transform(tr)
+            if i % 10 == 0:  # Print progress every 10 waypoints
+                print(f"Waypoint {i}/{len(smooth_route)}")
             time.sleep(0.05)
         print("Firetruck has reached its destination or the route has ended!")
     finally:
