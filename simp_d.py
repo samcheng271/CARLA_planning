@@ -136,7 +136,6 @@ class DStar:
         return self.get_kmin()
 
     def modify_cost(self, wp1, wp2, cost):
-        #edgeKey = frozenset((self.waypoint_location(wp1), self.waypoint_location(wp2)))
         edgeKey = (self.waypoint_location(wp1), self.waypoint_location(wp2))
         self.edge_cost[edgeKey] = cost
         for wp in (wp1, wp2):
