@@ -276,8 +276,6 @@ class DStar:
         ]
         print(f"{tag} ({len(coords)} waypoints):\n{coords}\n")
 
-    
-
 if __name__ == "__main__":
     try:
         client        = carla.Client("localhost", 4000)
@@ -359,11 +357,11 @@ if __name__ == "__main__":
                 print("len path")
                 wp = path[i]
                 print("wp")
-                prev_list = wp.previous(planner.resolution)
-                if prev_list:
-                    for prev_wp in prev_list:
-                        planner.modify_cost(wp, prev_wp, obs_cost)
-                        planner.modify_cost(prev_wp, wp, obs_cost)
+                neighbor_list = planner.get_neighbors(wp)
+                if neighbor_list:
+                    for n_wp in neighbor_list:
+                        planner.modify_cost(wp, n_wp, obs_cost)
+                        planner.modify_cost(n_wp, wp, obs_cost)
         print("before new path")
         new_path = planner.run()
         print(f"new path: {new_path}")
