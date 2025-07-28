@@ -476,13 +476,22 @@ if __name__ == '__main__':
 
 
     # Choose a random starting location (point A)
-    point_a = random.choice(spawn_points)
+    start_ind = 25
+    end_ind = 35
+        # Choose a random starting location (point A)
+        #point_a = random.choice(spawn_points)
+    point_a = spawn_points[start_ind]
     firetruck = world.spawn_actor(firetruck_bp, point_a)
-    # Choose a random destination (point B)
-    point_b = random.choice(spawn_points)
-    if point_b.location == point_a.location:
+
+        # Choose a random destination (point B)
+    point_b  = spawn_points[end_ind]
+        #point_b = random.choice(spawn_points)
+    while point_b.location == point_a.location:
         point_b = random.choice(spawn_points)
+
     start_waypoint = carla_map.get_waypoint(point_a.location)
+    end_waypoint = carla_map.get_waypoint(point_b.location)
+
     print(f"Start waypoint: {start_waypoint}")
 
     end_waypoint = carla_map.get_waypoint(point_b.location)
