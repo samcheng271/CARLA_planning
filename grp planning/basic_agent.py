@@ -19,6 +19,7 @@ from agents.tools.misc import (get_speed, is_within_distance,
                                compute_distance)
 
 import numpy as np
+from itertools import tee
 
 def loc_to_vec(loc: carla.Location) -> np.ndarray:
         return np.array([loc.x, loc.y, loc.z], dtype=float)
@@ -29,6 +30,18 @@ def vec_to_loc(v: np.ndarray) -> carla.Location:
 def bz_curve(p0, p1, p2, t):
     u = 1.0 - t
     return (u*u) * p0 + 2*u*t * p1 + (t*t) * p2
+
+def cubic_bz(p0, p1, p2, p3, t):
+    u = 1.0 - t
+    return (u**3) * p0 \
+         + 3 * (u**2) * t * p1 \
+         + 3 * u * (t**2) * p2 \
+         + (t**3) * p3
+
+def pairwise(iterable):
+    a, b = tee(iterable)
+    next(b, None)
+    return zip(a, b)
 
 
 class BasicAgent(object):
@@ -205,32 +218,57 @@ class BasicAgent(object):
         # depending on the car's rotation, we can figure out what lane
         # they want to change to.
 
+        # Applied bezier curve to route
+        use_bezier = False
+
         for i in range(len(route_trace)):
             if (i != len(route_trace) - 1):
                 yaw = route_trace[i][-1][0].transform.rotation.yaw
 
                 x_1, y_1 = route_trace[i][-1][0].transform.location.x, route_trace[i][-1][0].transform.location.y
-                x_2, y_2 = route_trace[i + 1][0][0].transform.location.x, route_trace[i + 1][0][0].transform.location.y
+                # extended end for bezier curves
+                x_2, y_2 = route_trace[i + 1][3][0].transform.location.x, route_trace[i + 1][0][0].transform.location.y
 
                 # Bezier cruves
                 p0 = loc_to_vec(route_trace[i][-1][0].transform.location) 
-                p1 = np.array([x_2, y_1, 0.0]) # control point
-                p2 = loc_to_vec(route_trace[i + 1][0][0].transform.location)          
+                p1 = np.array([x_1 + (x_2 - x_1) * 0.75, y_1 + (y_2 - y_1) * 0.0, 0.0]) # control point
+                p2 = np.array([x_2 - (x_2 - x_1) * 0.75, y_2 - (y_2 - y_1) * 0.0, 0.0]) # control point
+                p3 = loc_to_vec(route_trace[i + 1][3][0].transform.location)
+
+                # Regular end for regular curves
+                x_2, y_2 = route_trace[i + 1][0][0].transform.location.x, route_trace[i + 1][0][0].transform.location.y   
+
+                print("p0: ", p0, "p1: ", p1, "p2: ", p2, "p3: ", p3)     
 
                 print("bezier curves: ", p0, p2, p1)    
                 #right_vec = current_node.waypoint.transform.get_right_vector()
                 #cp_up    = p0 + np.array([0.0, 0.0, 3.0])              
                 #cp_right = p0 + np.array([right_vec.x, right_vec.y, right_vec.z]) * 3.0
                 #p1 = cp_up 
-                for t in np.linspace(0.0, 1.0, 20):                   
-                    pt = bz_curve(p0, p1, p2, t)
-                    self._world.debug.draw_point(
-                        vec_to_loc(pt),
-                        size=0.08,
-                        color=carla.Color(0, 0, 255),
-                        life_time=15.0)
+
+                alternate_lane_path = []
+                for t in np.linspace(0.0, 1.0, 30, endpoint=True):
+                            
+                    pt = cubic_bz(p0, p1, p2, p3, t)
+                    loc = vec_to_loc(pt)
+                    rot = (route_trace[i + 1][0][0]).transform.rotation 
+
+                    wpt = Waypoint(Transform(loc, rot))
+                    print("Waypoint test: ", wpt)
+
+                    # Print points
+                    # self._world.debug.draw_point(
+                    #     vec_to_loc(pt),
+                    #     size=0.08,
+                    #     color=carla.Color(0, 0, 255),
+                    #     life_time=15.0)
+                    
+                    alternate_lane_path.append(vec_to_loc(pt))
+                    
 
                 ###############
+
+                lane_path = None
 
                 if yaw < 185 and yaw > 175:
                     if y_2 < y_1:
@@ -238,8 +276,9 @@ class BasicAgent(object):
                     else:
                         lane_path = self._generate_lane_change_path(route_trace[i][-1][0], 'left', 0,0,1)
 
-                    print("lane change vertical: ", lane_path)
-                    route_trace[i] = route_trace[i] + lane_path
+                    # print("lane change vertical: ", lane_path)
+                    if not use_bezier:
+                        route_trace[i] = route_trace[i] + lane_path
                     
                 if yaw < -85 and yaw > -95:
                     if x_2 < x_1:
@@ -247,12 +286,31 @@ class BasicAgent(object):
                     else:
                         lane_path = self._generate_lane_change_path(route_trace[i][-1][0], 'left', 0,0,1)
 
-                    route_trace[i] = route_trace[i] + lane_path
+                    if not use_bezier:
+                        route_trace[i] = route_trace[i] + lane_path
+
+                if use_bezier:
+                    route_trace[i] = route_trace[i] + alternate_lane_path
+
+                print("Lane_path: ")
+                for pt in lane_path:
+                    waypt, road_opt = pt
+                    print(waypt, road_opt)
+                    
 
         final_route = []
 
         for route in route_trace:
             final_route = final_route + route
+
+        # Drawn Line with carla path
+        for i in range(len(final_route) - 1):
+            self._world.debug.draw_line(
+                final_route[i], final_route[i+1],
+                thickness=0.05,
+                color=carla.Color(0,0,255),
+                life_time=10.0
+            )
 
         print("set_destination: ", final_route)
 
