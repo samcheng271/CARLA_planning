@@ -5,7 +5,6 @@ import time
 from PriorityQueueDLite import PriorityQueue, Priority
 import tempDLiteNoGenWP
 import sys
-import keyboard
 # print(sys.getrecursionlimit())
 sys.setrecursionlimit(50000)
 

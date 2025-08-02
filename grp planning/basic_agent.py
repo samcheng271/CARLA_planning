@@ -11,12 +11,22 @@ It can also make use of the global route planner to follow a specifed route
 
 import carla
 from shapely.geometry import Polygon
+'''
+import os, sys
+HERE      = os.path.dirname(__file__)                   
+AGENTS    = os.path.abspath(os.path.join(HERE, os.pardir))    
+CARLA_ROOT= os.path.abspath(os.path.join(HERE, os.pardir, os.pardir)) 
 
+sys.path.insert(0, AGENTS)
+sys.path.insert(0, CARLA_ROOT)
+'''
 from agents.navigation.local_planner import LocalPlanner, RoadOption
 from agents.navigation.global_route_planner import GlobalRoutePlanner
-from agents.tools.misc import (get_speed, is_within_distance,
-                               get_trafficlight_trigger_location,
-                               compute_distance)
+from agents.tools.misc import (
+        get_speed, is_within_distance,
+        get_trafficlight_trigger_location,
+        compute_distance
+    )
 
 import numpy as np
 from itertools import tee
@@ -37,6 +47,44 @@ def cubic_bz(p0, p1, p2, p3, t):
          + 3 * (u**2) * t * p1 \
          + 3 * u * (t**2) * p2 \
          + (t**3) * p3
+
+def bz_velocity(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, t: float) -> np.ndarray:
+    #First derivative of a cubic bezier 
+    u = 1.0 - t
+    return 3 * ((u**2) * (p1 - p0) + 2 * u * t * (p2 - p1) + (t**2) * (p3 - p2))
+
+def bz_acc(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, t: float) -> np.ndarray:
+    #Second derivative of a cubic bezier 
+    u = 1.0 - t
+    return 6 * (u * (p2 - 2*p1 + p0) + t * (p3 - 2*p2 + p1))
+
+def bz_curvature(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, t: float) -> float:
+    d1 = bz_velocity(p0, p1, p2, p3, t)
+    d2 = bz_acc(p0, p1, p2, p3, t)
+    cross = np.cross(d1, d2)
+    num   = np.linalg.norm(cross)
+    den   = np.linalg.norm(d1)**3
+    return float(num / den)
+
+def jaggedness(route): 
+    wp_xy = []
+    for item in route: 
+        wp = item[0] if isinstance(item, (tuple, list)) and len(item) >= 1 else item
+        if hasattr(wp, "location"):
+            wp_loc = wp.location
+        elif hasattr(wp, "transform") and hasattr(wp.transform, "location"):
+                wp_loc = wp.transform.location
+        else: 
+            continue 
+        wp_xy.append([wp_loc.x, wp_loc.y])
+    if(len(wp_xy) < 3):
+        return "zero"
+    stacked_list = np.stack(wp_xy, axis = 0)
+    head_angle = np.unwrap(np.arctan2(np.diff(stacked_list[:,1]), np.diff(stacked_list[:,0])))
+    diff_angle = np.diff(head_angle)
+    abs_angle = np.abs(diff_angle)
+    sum_of_angles = np.sum(abs_angle)
+    return sum_of_angles
 
 def pairwise(iterable):
     a, b = tee(iterable)
@@ -219,7 +267,7 @@ class BasicAgent(object):
         # they want to change to.
 
         # Applied bezier curve to route
-        use_bezier = False
+        use_bezier = True
 
         for i in range(len(route_trace)):
             if (i != len(route_trace) - 1):
@@ -247,14 +295,16 @@ class BasicAgent(object):
                 #p1 = cp_up 
 
                 alternate_lane_path = []
-                for t in np.linspace(0.0, 1.0, 30, endpoint=True):
-                            
+                for t in np.linspace(0.0, 1.0, 30, endpoint=True):         
                     pt = cubic_bz(p0, p1, p2, p3, t)
+                    #print("1")
+                    curve = bz_curvature(p0, p1, p2, p3, t)
+                    print(f"t={t:.3}, curvature={curve:.6f}")
                     loc = vec_to_loc(pt)
                     rot = (route_trace[i + 1][0][0]).transform.rotation 
-
-                    wpt = Waypoint(Transform(loc, rot))
-                    print("Waypoint test: ", wpt)
+                    #wpt = Waypoint(Transform(loc, rot))
+                    #wpt = map.get_waypoint(loc, project_to_road=True, lane_type=carla.LaneType.Driving)
+                    #print("Waypoint test: ", wpt)
 
                     # Print points
                     # self._world.debug.draw_point(
@@ -262,9 +312,17 @@ class BasicAgent(object):
                     #     size=0.08,
                     #     color=carla.Color(0, 0, 255),
                     #     life_time=15.0)
+                     
+                    alternate_lane_path.append((loc, RoadOption.LANEFOLLOW))    
+                    '''
+                    else: 
+                        new_wp = carla.Transform(loc, rot)
+                        alternate_lane_path.append((new_wp, RoadOption.LANEFOLLOW))
+                    '''
                     
-                    alternate_lane_path.append(vec_to_loc(pt))
+                    #alternate_lane_path.append((wpt), RoadOption.LANEFOLLOW)
                     
+                #insert the lin space curvature calc here
 
                 ###############
 
@@ -278,6 +336,7 @@ class BasicAgent(object):
 
                     # print("lane change vertical: ", lane_path)
                     if not use_bezier:
+                        print("NO bz")
                         route_trace[i] = route_trace[i] + lane_path
                     
                 if yaw < -85 and yaw > -95:
@@ -287,12 +346,15 @@ class BasicAgent(object):
                         lane_path = self._generate_lane_change_path(route_trace[i][-1][0], 'left', 0,0,1)
 
                     if not use_bezier:
+                        print("No bz")
                         route_trace[i] = route_trace[i] + lane_path
 
                 if use_bezier:
+                    print("YES bz")
                     route_trace[i] = route_trace[i] + alternate_lane_path
 
                 print("Lane_path: ")
+                
                 for pt in lane_path:
                     waypt, road_opt = pt
                     print(waypt, road_opt)
@@ -305,14 +367,33 @@ class BasicAgent(object):
 
         # Drawn Line with carla path
         for i in range(len(final_route) - 1):
+            #print(f"final_route_type: {type(final_route[i][0])}")
+            #print(f"object: {final_route[i][0]}")
+            #print(f"final+1: {type(final_route[i+1][0])}")
+            curr_fr = final_route[i][0]
+            next_fr = final_route[i+1][0]
+
+            if isinstance(curr_fr, carla.Waypoint): 
+                curr_loc = curr_fr.transform.location
+            else: 
+                if isinstance(curr_fr, carla.Location): 
+                    curr_loc = curr_fr
+
+            if isinstance(next_fr, carla.Waypoint): 
+                next_loc = next_fr.transform.location
+            else: 
+                if isinstance(next_fr, carla.Location): 
+                    next_loc = next_fr
+
             self._world.debug.draw_line(
-                final_route[i], final_route[i+1],
-                thickness=0.05,
+                curr_loc, next_loc,
+                thickness=0.25,
                 color=carla.Color(0,0,255),
                 life_time=10.0
             )
 
-        print("set_destination: ", final_route)
+        #print("set_destination: ", final_route)
+        print(f"A* bz jaggedness:", jaggedness(final_route))
 
         self._local_planner.set_global_plan(final_route, clean_queue=clean_queue)
 
@@ -383,6 +464,8 @@ class BasicAgent(object):
                 control = self.add_emergency_stop(control)
                 self._previous_obstacle = obstacle_wpt
                 self.set_destination(self._destination, None, obstacle_wpt)
+
+
                 self._world.debug.draw_string(obstacle_wpt.transform.location, 'Obstacle', draw_shadow=False,
                 color=carla.Color(r=255, g=0, b=0), life_time=15.0,
                 persistent_lines=True)
@@ -391,8 +474,6 @@ class BasicAgent(object):
                 # control = self.add_emergency_stop(control)
         elif hazard_obstacle and hazard_light:
             control = self.add_emergency_stop(control)
-
-
         return control
 
     def done(self):
