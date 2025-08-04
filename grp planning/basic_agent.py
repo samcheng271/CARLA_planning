@@ -267,7 +267,7 @@ class BasicAgent(object):
         # they want to change to.
 
         # Applied bezier curve to route
-        use_bezier = True
+        use_bezier = False
 
         for i in range(len(route_trace)):
             if (i != len(route_trace) - 1):
@@ -388,12 +388,12 @@ class BasicAgent(object):
             self._world.debug.draw_line(
                 curr_loc, next_loc,
                 thickness=0.25,
-                color=carla.Color(0,0,255),
+                color=carla.Color(r=0, g=0, b=50, a=150),
                 life_time=10.0
             )
 
         #print("set_destination: ", final_route)
-        print(f"A* bz jaggedness:", jaggedness(final_route))
+        print(f"Jaggedness:", jaggedness(final_route))
 
         self._local_planner.set_global_plan(final_route, clean_queue=clean_queue)
 
