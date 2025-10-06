@@ -24,4 +24,5 @@ Carla/PythonAPI
 If it's ensured that all proper dependencies and modules are downloaded, then with `python3 simple-vehicle.py`, a simple test of the start to end of the vehicle agent should run.
 
 
-.\CarlaUE4.exe -carla-rpc-port=4000 (optional) -windowed -ResY=1000
+Command to run Carla: `.\CarlaUE4.exe -carla-rpc-port=4000 (optional) -windowed -ResY=1000`
+Replace with: `./CarlaUE4.sh` on mac
