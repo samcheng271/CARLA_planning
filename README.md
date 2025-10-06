@@ -1,5 +1,5 @@
 # Running Carla on Nautlius
-General Nautlius UI guide - https://github.com/oliverc1623/ceriad/blob/main/nautilus-files/README.md
+General Nautlius UI guide - https://github.com/oliverc1623/ceriad/blob/main/nautilus-files/README.md <br />
 Specific AIEA setup - https://github.com/cruz-control/nautilus/blob/main/sample-nautilus-desktop-gui/README.md
 
 
@@ -7,19 +7,20 @@ Specific AIEA setup - https://github.com/cruz-control/nautilus/blob/main/sample-
 To run A*: python3.8 astar.py
 
 # Carla Motion Planning:
-There is a specific file structure to follow to ensure all imports and files run properly as they should. 
+There is a specific file structure to follow to ensure all imports and files run properly as they should. <br />
 Noted here are the locations of the files to be replaced (from grp planning directory) and commands to run for testing:
 
-Carla/PythonAPI
-├───carla
-│   ├───agents
-│   │   ├───navigation
-│   │   │   └───local_planner.py
-│   │   │    ───global_route_planner.py
-│   │   │    ───basic_agent.py
-│   │   └───astar.py
-│   │    ───simple-vehicle.py
-├───examples
+```Carla/PythonAPI <br />
+├───carla <br />
+│   ├───agents <br />
+│   │   ├───navigation <br />
+│   │   │   └───local_planner.py <br />
+│   │   │    ───global_route_planner.py <br />
+│   │   │    ───basic_agent.py <br />
+│   │   └───astar.py <br />
+│   │    ───simple-vehicle.py <br />
+├───examples <br />
+```
 
 If it's ensured that all proper dependencies and modules are downloaded, then with `python3 simple-vehicle.py`, a simple test of the start to end of the vehicle agent should run.
 
