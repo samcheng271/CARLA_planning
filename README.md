@@ -1,3 +1,27 @@
-# CARLA_planning
+# Running Carla on Nautlius
+General Nautlius UI guide - https://github.com/oliverc1623/ceriad/blob/main/nautilus-files/README.md
+Specific AIEA setup - https://github.com/cruz-control/nautilus/blob/main/sample-nautilus-desktop-gui/README.md
 
-To run astar: python3.8 astar.py
+
+# CARLA_planning
+To run A*: python3.8 astar.py
+
+# Carla Motion Planning:
+There is a specific file structure to follow to ensure all imports and files run properly as they should. 
+Noted here are the locations of the files to be replaced (from grp planning directory) and commands to run for testing:
+
+Carla/PythonAPI
+├───carla
+│   ├───agents
+│   │   ├───navigation
+│   │   │   └───local_planner.py
+│   │   │    ───global_route_planner.py
+│   │   │    ───basic_agent.py
+│   │   └───astar.py
+│   │    ───simple-vehicle.py
+├───examples
+
+If it's ensured that all proper dependencies and modules are downloaded, then with `python3 simple-vehicle.py`, a simple test of the start to end of the vehicle agent should run.
+
+
+.\CarlaUE4.exe -carla-rpc-port=4000 (optional) -windowed -ResY=1000
