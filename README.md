@@ -11,15 +11,15 @@ There is a specific file structure to follow to ensure all imports and files run
 Noted here are the locations of the files to be replaced (from grp planning directory) and commands to run for testing:
 
 ```Carla/PythonAPI <br />
-├───carla <br />
-│   ├───agents <br />
-│   │   ├───navigation <br />
-│   │   │   └───local_planner.py <br />
-│   │   │    ───global_route_planner.py <br />
-│   │   │    ───basic_agent.py <br />
-│   │   └───astar.py <br />
-│   │    ───simple-vehicle.py <br />
-├───examples <br />
+├───carla
+│   ├───agents
+│   │   ├───navigation
+│   │   │   └───local_planner.py
+│   │   │    ───global_route_planner.py
+│   │   │    ───basic_agent.py
+│   │   └───astar.py
+│   │    ───simple-vehicle.py
+├───examples
 ```
 
 If it's ensured that all proper dependencies and modules are downloaded, then with `python3 simple-vehicle.py`, a simple test of the start to end of the vehicle agent should run.
