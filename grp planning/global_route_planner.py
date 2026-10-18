@@ -55,12 +55,12 @@ class GlobalRoutePlanner(object):
             current_waypoint = self._wmap.get_waypoint(route[0])
             destination_waypoint = self._wmap.get_waypoint(route[-1])
 
-            print("\ndestination_waypoint: ", destination_waypoint)
+            # print("\ndestination_waypoint: ", destination_waypoint)
 
             # Strips the start/end waypoints
             route = route[1:len(route) - 1]
 
-            print("route: ", route)
+            # print("route: ", route)
 
             for i in range(len(route) - 1):
 
@@ -409,7 +409,7 @@ class GlobalRoutePlanner(object):
 
         edge_route = edge_route_2
 
-        print("Edge pairs: ", edge_route)
+        # print("Edge pairs: ", edge_route)
 
         # edge
         current_start = self._localize(route[0].transform.location)[0]
@@ -440,7 +440,7 @@ class GlobalRoutePlanner(object):
             # or the car has reached its destination.
             # With that, a ending point is given, and if its a lane
             # change, then a new list is started for a new pathing.
-            print("waypoint edge dict: ", key, val, waypoint_edge_dict[key, val])
+            # print("waypoint edge dict: ", key, val, waypoint_edge_dict[key, val])
             if i != len(edge_route) - 1 and val != list(edge_route.keys())[i + 1]:
                 routing[current_index].append(waypoint_edge_dict[key, val][-1])
                 print("lane end_waypoint: ", waypoint_edge_dict[key, val][-1])
@@ -453,7 +453,7 @@ class GlobalRoutePlanner(object):
         # for i in range(len(routing)):
         #     routing[i] = list(dict.fromkeys(routing[i]))
 
-        print("routing without lane changes: ", len (routing), routing)
+        # print("routing without lane changes: ", len (routing), routing)
 
         return routing
 

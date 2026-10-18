@@ -137,6 +137,11 @@ class BasicAgent(object):
         self._sampling_resolution = 2.0
         self._base_tlight_threshold = 5.0  # meters
         self._base_vehicle_threshold = 5.0  # meters
+        # Detect stationary obstacles early, but do not brake until the ego
+        # vehicle reaches the smaller physical stand-off distance.
+        self._stationary_obstacle_lookahead_distance = 35.0  # meters
+        self._stationary_obstacle_standoff_distance = 8.0  # meters
+        self._stationary_obstacle_braking_deceleration = 3.0  # m/s^2
         self._speed_ratio = 1
         self._max_brake = 0.5
         self._offset = 0
@@ -172,7 +177,8 @@ class BasicAgent(object):
             )
             return self._world.spawn_actor(blueprint, transform, attach_to=self._vehicle)
 
-        self._front_obstacle_sensor = _spawn_obstacle_sensor(bb_extent.x, 0.0, 0.0, 20.0)
+        self._front_obstacle_sensor = _spawn_obstacle_sensor(
+            bb_extent.x, 0.0, 0.0, self._stationary_obstacle_lookahead_distance)
         self._rear_obstacle_sensor = _spawn_obstacle_sensor(-bb_extent.x, 0.0, 180.0, 6.0)
         self._left_obstacle_sensor = _spawn_obstacle_sensor(0.0, -bb_extent.y, -90.0, 6.0)
         self._right_obstacle_sensor = _spawn_obstacle_sensor(0.0, bb_extent.y, 90.0, 6.0)
@@ -251,6 +257,30 @@ class BasicAgent(object):
         control.hand_brake = False
         return control
 
+    def _front_gap_to_actor(self, other_actor):
+        """Return the longitudinal bumper-to-bumper gap to an actor ahead.
+
+        ``float('inf')`` is returned for actors behind the ego vehicle so they
+        can never trigger a front-obstacle stop.
+        """
+        try:
+            ego_transform = self._vehicle.get_transform()
+            ego_location = ego_transform.location
+            forward = ego_transform.get_forward_vector()
+            other_location = other_actor.get_location()
+
+            relative_x = other_location.x - ego_location.x
+            relative_y = other_location.y - ego_location.y
+            longitudinal_distance = relative_x * forward.x + relative_y * forward.y
+            if longitudinal_distance <= 0.0:
+                return float('inf')
+
+            ego_front = self._vehicle.bounding_box.extent.x
+            other_rear = other_actor.bounding_box.extent.x
+            return max(0.0, longitudinal_distance - ego_front - other_rear)
+        except RuntimeError:
+            return float('inf')
+
     def set_target_speed(self, speed):
         """
         Changes the target speed of the agent
@@ -279,8 +309,7 @@ class BasicAgent(object):
         """
         This method creates a list of waypoints between a starting and ending location,
         based on the route returned by the global router, and adds it to the local planner.
-        If no starting location is passed, the vehicle local planner's target location is chosen,
-        which corresponds (by default), to a location about 5 meters in front of the vehicle.
+        If no starting location is passed, the vehicle's current location is used.
 
             :param end_location (carla.Location): final location of the route
             :param start_location (carla.Location): starting location of the route
@@ -316,15 +345,10 @@ class BasicAgent(object):
 
         if type(end_location) is not list:
             if not start_location:
-                if not isinstance(self._local_planner.target_waypoint, carla.Waypoint):
-                    start_location = self._local_planner.target_waypoint
-                else:
-                    start_location = self._local_planner.target_waypoint.transform.location
-                # start_location = self._vehicle.get_location()
-                clean_queue = True
-            else:
                 start_location = self._vehicle.get_location()
-                clean_queue = False
+            # A newly generated route must replace stale waypoints, including
+            # those leading toward the obstacle that triggered the replan.
+            clean_queue = True
 
             start_waypoint = self._map.get_waypoint(start_location)
             print("basic_agent start location: " , start_location)
@@ -623,14 +647,11 @@ class BasicAgent(object):
         hazard_obstacle = False
         hazard_light = False
 
-        # Retrieve all relevant actors
-        vehicle_list = self._world.get_actors().filter("*vehicle*")
-
         # vehicle_speed = get_speed(self._vehicle) / 3.6
         vehicle_speed = get_speed(self._vehicle) / 5
 
         # Sensor-based blocking check over current plan
-        min_vehicle_distance = 25
+        min_vehicle_distance = self._stationary_obstacle_lookahead_distance
         ego_location = self._vehicle.get_location()
         plan_queue = list(self._local_planner.get_plan())
         plan_waypoints = [wp for wp, _ in plan_queue]
@@ -659,10 +680,10 @@ class BasicAgent(object):
 
                     obstacle_speed = obstacle_velocity.length() if obstacle_velocity is not None else 0.0
 
-                    if obstacle_speed < 100.0:
+                    if obstacle_speed < 1.0:
                         hazard_obstacle = True
                         blocking_candidates.append(actor.id)
-                    break
+                    # break
 
         # Deduplicate while preserving detection order.
         blocking_candidates = list(dict.fromkeys(blocking_candidates))
@@ -694,7 +715,9 @@ class BasicAgent(object):
         elif hazard_obstacle:
 
             obstacle_adjacent_lane_blocked = False
+            closest_blocking_gap = float('inf')
             for candidate_id in blocking_candidates:
+                obstacle_actor = self._world.get_actor(candidate_id)
                 obstacle_loc = self.get_detected_agent_attribute(
                     candidate_id,
                     'location',
@@ -702,7 +725,6 @@ class BasicAgent(object):
                 )
 
                 if obstacle_loc is None:
-                    obstacle_actor = self._world.get_actor(candidate_id)
                     if obstacle_actor:
                         obstacle_loc = obstacle_actor.get_location()
 
@@ -710,21 +732,36 @@ class BasicAgent(object):
                     continue
 
                 obstacle_wpt = self._map.get_waypoint(obstacle_loc, lane_type=carla.LaneType.Any)
-                if self._adjacent_lane_waypoints_blocked(obstacle_wpt):
+                if not self._has_open_adjacent_lane(obstacle_wpt):
                     obstacle_adjacent_lane_blocked = True
-                    break
-
-            # if obstacle_adjacent_lane_blocked:
-            #     print("adjacent lane blocked: ", obstacle_wpt)
-
-            agent_adjacent_lane_blocked = self._adjacent_lane_waypoints_blocked(self._map.get_waypoint(self._vehicle.get_location()))
+                    if obstacle_actor is not None:
+                        closest_blocking_gap = min(
+                            closest_blocking_gap,
+                            self._front_gap_to_actor(obstacle_actor)
+                        )
 
             current_blocking_ids = set(blocking_candidates)
 
-            # if obstacle_wpt and (adjacent_lane_blocked or (left_blocked and right_blocked)):
             if blocking_candidates and obstacle_adjacent_lane_blocked:
-                print("Adjacent lane waypoint(s) blocked near obstacle. Emergency stopping.")
-                control = self.add_emergency_stop(control)
+                ego_speed_mps = get_speed(self._vehicle) / 3.6
+                braking_trigger_gap = (
+                    self._stationary_obstacle_standoff_distance +
+                    (ego_speed_mps ** 2) /
+                    (2.0 * self._stationary_obstacle_braking_deceleration)
+                )
+                if closest_blocking_gap <= braking_trigger_gap:
+                    print(
+                        "No open adjacent lane near obstacle. Braking toward "
+                        f"{self._stationary_obstacle_standoff_distance:.1f} m stand-off "
+                        f"(gap: {closest_blocking_gap:.1f} m)."
+                    )
+                    control = self.add_emergency_stop(control)
+                else:
+                    print(
+                        "No open adjacent lane near obstacle; "
+                        f"continuing to {self._stationary_obstacle_standoff_distance:.1f} m stand-off "
+                        f"(gap: {closest_blocking_gap:.1f} m)."
+                    )
 
             # Currently not considering if any of the obstacles are moving,
             # just if it is the same vehicles that have been detected before, 
@@ -742,7 +779,7 @@ class BasicAgent(object):
                 print()
 
                 self._previous_obstacle = current_blocking_ids
-                self.set_destination(self._destination, None)
+                self.set_destination(self._destination, self._vehicle.get_location())
 
                 for candidate in blocking_candidates:
                     candidate_loc = self.get_detected_agent_attribute(candidate, 'location')
@@ -1006,8 +1043,8 @@ class BasicAgent(object):
                 persistent_lines=False
             )
 
-    def _adjacent_lane_waypoints_blocked(self, obstacle_wpt):
-        """Return True if left/right adjacent lane waypoint near obstacle is occupied by a seen obstacle mesh."""
+    def _has_open_adjacent_lane(self, obstacle_wpt):
+        """Return whether either adjacent lane is drivable and clear of seen vehicles."""
         if not obstacle_wpt:
             return False
         
@@ -1040,26 +1077,23 @@ class BasicAgent(object):
             )
             return dot > 0.0
 
-        def waypoint_blocked_by_seen_obstacle(candidate_wp):
+        def lane_is_open(candidate_wp):
             if not is_direction_compatible(candidate_wp):
-                return True
+                return False
 
             candidate_loc = candidate_wp.transform.location
             for obs in obs_data:
                 obs_mesh = obs['mesh']
                 if obs_mesh.contains_waypoint(candidate_loc, radius_m=0.5):
-                    return True
-            return False
-
-        left_blocked = waypoint_blocked_by_seen_obstacle(left_wp)
-        right_blocked = waypoint_blocked_by_seen_obstacle(right_wp)
-
-        print("left_blocked:", left_blocked, "right_blocked:", right_blocked)
-
-        if left_blocked and right_blocked:
+                    return False
             return True
-        else:
-            return False
+
+        left_open = lane_is_open(left_wp)
+        right_open = lane_is_open(right_wp)
+
+        print("left_open:", left_open, "right_open:", right_open)
+
+        return left_open or right_open
 
 
     def _get_seen_obstacle_waypoints(self):
@@ -1247,5 +1281,3 @@ class BasicAgent(object):
             plan.append((next_wp, RoadOption.LANEFOLLOW))
 
         return plan
-
-
